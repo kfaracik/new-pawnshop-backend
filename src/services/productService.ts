@@ -15,9 +15,30 @@ const getNewProducts = async () => {
   });
 };
 
+const searchProducts = async (query: string, skip: number, limit: number) => {
+  try {
+    const partialMatch = await Product.find({
+      title: { $regex: query, $options: "i" },
+    })
+      .skip(skip)
+      .limit(limit);
+
+    return partialMatch;
+  } catch (error) {
+    console.error("Error while searching products:", error);
+    throw new Error("Error while searching products");
+  }
+};
+
 const createProduct = async (productData: { name: string; price: number }) => {
   const product = new Product(productData);
   return await product.save();
 };
 
-export default { getProducts, getTotalProducts, getNewProducts, createProduct };
+export default {
+  getProducts,
+  getTotalProducts,
+  searchProducts,
+  getNewProducts,
+  createProduct,
+};
