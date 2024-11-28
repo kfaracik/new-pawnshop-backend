@@ -8,9 +8,16 @@ const getTotalProducts = async () => {
   return await Product.countDocuments();
 };
 
+const getNewProducts = async () => {
+  return await Product.find({}, null, {
+    sort: { _id: -1 },
+    limit: 8,
+  });
+};
+
 const createProduct = async (productData: { name: string; price: number }) => {
   const product = new Product(productData);
   return await product.save();
 };
 
-export default { getProducts, getTotalProducts, createProduct };
+export default { getProducts, getTotalProducts, getNewProducts, createProduct };
