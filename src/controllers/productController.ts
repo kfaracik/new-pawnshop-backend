@@ -38,13 +38,20 @@ const searchProducts = async (
     const limit = parseInt(req.query.limit as string, 10) || 10;
     const skip = (page - 1) * limit;
 
-    const products = await ProductService.searchProducts(query, skip, limit);
+    const { products, totalProducts } = await ProductService.searchProducts(
+      query,
+      skip,
+      limit
+    );
 
-    if (!products || products.length === 0) {
-      return res.status(404).json({ message: "No products found" });
-    }
-
-    res.status(200).json(products);
+    res.status(200).json({
+      products,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(totalProducts / limit),
+        totalProducts,
+      },
+    });
   } catch (error) {
     console.error(error);
     next(error);

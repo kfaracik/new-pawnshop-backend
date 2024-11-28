@@ -16,18 +16,17 @@ const getNewProducts = async () => {
 };
 
 const searchProducts = async (query: string, skip: number, limit: number) => {
-  try {
-    const partialMatch = await Product.find({
-      title: { $regex: query, $options: "i" },
-    })
-      .skip(skip)
-      .limit(limit);
+  const filter = query ? { title: { $regex: query, $options: "i" } } : {};
 
-    return partialMatch;
-  } catch (error) {
-    console.error("Error while searching products:", error);
-    throw new Error("Error while searching products");
-  }
+  const productsPromise = Product.find(filter).skip(skip).limit(limit).exec();
+  const totalProductsPromise = Product.countDocuments(filter).exec();
+
+  const [products, totalProducts] = await Promise.all([
+    productsPromise,
+    totalProductsPromise,
+  ]);
+
+  return { products, totalProducts };
 };
 
 const createProduct = async (productData: { name: string; price: number }) => {
