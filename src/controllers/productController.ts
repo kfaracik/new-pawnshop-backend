@@ -7,8 +7,34 @@ const getAllProducts = async (
   next: NextFunction
 ) => {
   try {
-    const products = await ProductService.getAllProducts();
-    res.status(200).json(products);
+    const page = parseInt(req.query.page as string, 10) || 1;
+    const limit = parseInt(req.query.limit as string, 10) || 10;
+    const skip = (page - 1) * limit;
+
+    const [products, total] = await Promise.all([
+      ProductService.getProducts(skip, limit),
+      ProductService.getTotalProducts(),
+    ]);
+
+    res.status(200).json({
+      total,
+      page,
+      limit,
+      products,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getNewProducts = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const newProducts = await ProductService.getNewProducts();
+    res.status(200).json(newProducts);
   } catch (error) {
     next(error);
   }
@@ -27,4 +53,4 @@ const createProduct = async (
   }
 };
 
-export default { getAllProducts, createProduct };
+export default { getAllProducts, getNewProducts, createProduct };
