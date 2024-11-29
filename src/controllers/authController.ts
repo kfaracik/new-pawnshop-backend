@@ -2,6 +2,19 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { User } from "../models/userModel";
 
+export const getUserData = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ email: user.email });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 export const register = async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -57,6 +70,7 @@ export const login = async (req, res, next) => {
 };
 
 export default {
+  getUserData,
   register,
   login,
 };
