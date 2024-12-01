@@ -3,7 +3,6 @@ import productRoutes from "./routes/productRoutes";
 import authRoutes from "./routes/authRoutes";
 import { connectDB } from "./config/db";
 import errorHandler from "./middlewares/errorHandler";
-import orderRoutes from "./routes/orderRoutes";
 
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("../swaggerConfig");
@@ -25,7 +24,6 @@ app.use(
 
 app.use("/api/products", productRoutes);
 app.use("/api/auth", authRoutes);
-app.use("/api/order", orderRoutes);
 
 app.use(errorHandler);
 
