@@ -1,6 +1,6 @@
 import { Router } from "express";
 import productController from "../controllers/productController";
-import { authenticateAdmin } from "../middlewares/authAdmin";
+import { isAdmin } from "../middlewares/authAdmin";
 
 const router = Router();
 
@@ -260,8 +260,8 @@ const router = Router();
 router.get("/", productController.getAllProducts);
 router.get("/new", productController.getNewProducts);
 router.get("/search", productController.searchProducts);
-router.post("/", authenticateAdmin, productController.createProduct);
-router.put("/:id", authenticateAdmin, productController.updateProduct);
-router.delete("/:id", authenticateAdmin, productController.deleteProduct);
+router.post("/", isAdmin, productController.createProduct);
+router.put("/:id", isAdmin, productController.updateProduct);
+router.delete("/:id", isAdmin, productController.deleteProduct);
 
 export default router;
