@@ -84,9 +84,43 @@ const createProduct = async (
   }
 };
 
+const updateProduct = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const updatedProduct = await ProductService.updateProduct(req.params.id, req.body);
+    if (!updatedProduct) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    res.status(200).json(updatedProduct);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteProduct = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const deletedProduct = await ProductService.deleteProduct(req.params.id);
+    if (!deletedProduct) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    res.status(200).json({ message: "Product deleted successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
   getAllProducts,
   getNewProducts,
   searchProducts,
   createProduct,
+  updateProduct,
+  deleteProduct,
 };
