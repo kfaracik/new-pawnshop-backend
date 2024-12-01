@@ -1,17 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 
-export const authenticateAdmin = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
   const user = req.user;
 
-  if (user && user.role === "admin") {
-    return next();
+  if (!user || user.role !== "admin") {
+    return res.status(403).json({ message: "Forbidden, only admins allowed" });
   }
 
-  return res
-    .status(403)
-    .json({ message: "Access denied, admin role required." });
+  next();
 };
