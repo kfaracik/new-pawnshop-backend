@@ -4,13 +4,27 @@ import { User } from "../models/userModel";
 
 export const getUserData = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId);
+    const token = req.header("Authorization")?.replace("Bearer ", "");
+
+    if (!token) {
+      return res.status(401).json({ message: "No token provided" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await User.findById(decoded.id);
+
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    res.json({ email: user.email });
+    res.json({
+      id: user._id,
+      email: user.email,
+      name: user.name,
+    });
   } catch (err) {
+    console.error("Error fetching user data:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
