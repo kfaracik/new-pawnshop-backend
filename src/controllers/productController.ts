@@ -27,6 +27,22 @@ const getAllProducts = async (
   }
 };
 
+const getProduct = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const product = await ProductService.getProduct(id);
+
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    res.status(200).json(product);
+  } catch (error) {
+    console.error("Error fetching product:", error);
+    next(error);
+  }
+};
+
 const searchProducts = async (
   req: Request,
   res: Response,
@@ -90,7 +106,10 @@ const updateProduct = async (
   next: NextFunction
 ) => {
   try {
-    const updatedProduct = await ProductService.updateProduct(req.params.id, req.body);
+    const updatedProduct = await ProductService.updateProduct(
+      req.params.id,
+      req.body
+    );
     if (!updatedProduct) {
       return res.status(404).json({ message: "Product not found" });
     }
@@ -118,6 +137,7 @@ const deleteProduct = async (
 
 export default {
   getAllProducts,
+  getProduct,
   getNewProducts,
   searchProducts,
   createProduct,
