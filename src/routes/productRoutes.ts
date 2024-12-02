@@ -64,6 +64,41 @@ const router = Router();
 
 /**
  * @swagger
+ * /products/{id}:
+ *   get:
+ *     summary: Retrieve a product by its ID
+ *     tags: [Products]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         description: The ID of the product to retrieve
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Details of the product
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                 name:
+ *                   type: string
+ *                 price:
+ *                   type: number
+ *                   format: float
+ *       404:
+ *         description: Product not found
+ *       500:
+ *         description: Internal server error
+ */
+
+
+/**
+ * @swagger
  * /products/new:
  *   get:
  *     summary: Retrieve the latest products
@@ -260,6 +295,7 @@ const router = Router();
 router.get("/", productController.getAllProducts);
 router.get("/new", productController.getNewProducts);
 router.get("/search", productController.searchProducts);
+router.get("/:id", productController.getProduct);
 router.post("/", isAdmin, productController.createProduct);
 router.put("/:id", isAdmin, productController.updateProduct);
 router.delete("/:id", isAdmin, productController.deleteProduct);
