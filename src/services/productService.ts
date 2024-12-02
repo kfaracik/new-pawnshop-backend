@@ -4,6 +4,10 @@ const getProducts = async (skip: number, limit: number) => {
   return await Product.find().skip(skip).limit(limit);
 };
 
+const getProduct = async (id: string) => {
+  return await Product.findById(id);
+};
+
 const getTotalProducts = async () => {
   return await Product.countDocuments();
 };
@@ -21,7 +25,10 @@ const searchProducts = async (query: string, skip: number, limit: number) => {
   const productsPromise = Product.find(filter).skip(skip).limit(limit).exec();
   const totalProductsPromise = Product.countDocuments(filter).exec();
 
-  const [products, totalProducts] = await Promise.all([productsPromise, totalProductsPromise]);
+  const [products, totalProducts] = await Promise.all([
+    productsPromise,
+    totalProductsPromise,
+  ]);
 
   return { products, totalProducts };
 };
@@ -31,7 +38,10 @@ const createProduct = async (productData: { name: string; price: number }) => {
   return await product.save();
 };
 
-const updateProduct = async (productId: string, productData: { name: string; price: number }) => {
+const updateProduct = async (
+  productId: string,
+  productData: { name: string; price: number }
+) => {
   return await Product.findByIdAndUpdate(productId, productData, { new: true });
 };
 
@@ -41,6 +51,7 @@ const deleteProduct = async (productId: string) => {
 
 export default {
   getProducts,
+  getProduct,
   getTotalProducts,
   searchProducts,
   getNewProducts,
