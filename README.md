@@ -84,6 +84,7 @@ The backend is structured for scalability and maintainability. Below is the dire
 - Example collections:
   - `users`
   - `items`
+  - `categories`
   - `transactions`
 
 ### **Cross-Origin Resource Sharing**
