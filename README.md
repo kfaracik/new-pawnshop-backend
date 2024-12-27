@@ -1,4 +1,4 @@
-# **New Pawnshop Backend Documentation**
+# **New Pawnshop Backend **
 
 ## **Overview**
 The **New Pawnshop Backend** is a robust server application designed to manage the backend functionality of a modern pawnshop platform. Built using **Node.js**, **Express**, and **MongoDB**, it incorporates features such as user authentication, secure data handling, and API documentation for seamless integration with client applications.
