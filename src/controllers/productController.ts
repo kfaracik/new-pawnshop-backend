@@ -87,7 +87,7 @@ const getNewProducts = async (
   }
 };
 
-const suggestedProducts = async (
+const getSuggestedProducts = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -102,7 +102,7 @@ const suggestedProducts = async (
   }
 };
 
-const popularProducts = async (
+const getPopularProducts = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -169,10 +169,10 @@ export default {
   getAllProducts,
   getProduct,
   getNewProducts,
+  getSuggestedProducts,
+  getPopularProducts,
   searchProducts,
   createProduct,
   updateProduct,
   deleteProduct,
-  suggestedProducts,
-  popularProducts,
 };
