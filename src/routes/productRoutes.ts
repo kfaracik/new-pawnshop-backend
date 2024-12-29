@@ -294,6 +294,8 @@ const router = Router();
 
 router.get("/", productController.getAllProducts);
 router.get("/new", productController.getNewProducts);
+router.get("/suggested", productController.getSuggestedProducts);
+router.get("/popular", productController.getPopularProducts);
 router.get("/search", productController.searchProducts);
 router.get("/:id", productController.getProduct);
 router.post("/", isAdmin, productController.createProduct);
