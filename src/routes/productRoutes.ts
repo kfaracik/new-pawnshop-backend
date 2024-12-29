@@ -126,6 +126,81 @@ const router = Router();
 
 /**
  * @swagger
+ * /products/suggested:
+ *   get:
+ *     summary: Retrieve suggested products based on user preferences
+ *     tags: [Products]
+ *     parameters:
+ *       - name: userId
+ *         in: query
+ *         description: The user ID to get personalized product suggestions
+ *         required: false
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: A list of suggested products based on user preferences
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 products:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       price:
+ *                         type: number
+ *                         format: float
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /products/popular:
+ *   get:
+ *     summary: Retrieve popular products based on sales or views
+ *     tags: [Products]
+ *     parameters:
+ *       - name: limit
+ *         in: query
+ *         description: The number of popular products to retrieve
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *     responses:
+ *       200:
+ *         description: A list of popular products
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 products:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       price:
+ *                         type: number
+ *                         format: float
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
  * /products/search:
  *   get:
  *     summary: Search for products by query
