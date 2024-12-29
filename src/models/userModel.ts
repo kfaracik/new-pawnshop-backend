@@ -1,4 +1,4 @@
-import { Schema, model, models } from "mongoose";
+import mongoose, { Schema, model, models } from "mongoose";
 import bcrypt from "bcrypt";
 
 const UserSchema = new Schema(
@@ -19,6 +19,12 @@ const UserSchema = new Schema(
       required: [true, "Password is required"],
       minlength: [6, "Password must be at least 6 characters"],
     },
+    favoriteCategories: [
+      {
+        type: mongoose.Types.ObjectId,
+        ref: "Category",
+      },
+    ],
     isAdmin: {
       type: Boolean,
       default: false,
