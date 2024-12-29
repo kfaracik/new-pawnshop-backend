@@ -116,9 +116,9 @@ const getSuggestedProducts = async (userId?: string) => {
 
 const getPopularProducts = async (limit: number) => {
   return await Product.find({
-    stock: { $gt: 0 },
+    // stock: { $gt: 0 }, // TODO: Produkty muszą być dostępne w magazynie
   })
-    .sort({ stock: -1 })
+    .sort({ price: -1 })
     .limit(limit)
     .exec();
 };
