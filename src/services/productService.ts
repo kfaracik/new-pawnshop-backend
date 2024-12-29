@@ -1,6 +1,6 @@
 import { Product } from "../models/productModel";
 import { Types } from "mongoose";
-import { User } from "../models/userModel";
+import { IUser, User } from "../models/userModel";
 
 const getProducts = async (skip: number, limit: number) => {
   return await Product.find({}, null, {
@@ -93,7 +93,7 @@ const getSuggestedProducts = async (userId?: string) => {
     if (userId) {
       const user = await User.findById(userId)
         .select("favoriteCategories")
-        .lean();
+        .lean<IUser>();
 
       favoriteCategories = user?.favoriteCategories || [];
     }
@@ -101,9 +101,7 @@ const getSuggestedProducts = async (userId?: string) => {
     const query = favoriteCategories.length
       ? {
           category: {
-            $in: favoriteCategories.map(
-              (cat: string) => new Types.ObjectId(cat)
-            ),
+            $in: favoriteCategories.map((cat) => new Types.ObjectId(cat)),
           },
           stock: { $gt: 0 },
         }
