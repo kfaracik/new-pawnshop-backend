@@ -1,5 +1,4 @@
 import { Schema, model, models } from "mongoose";
-import bcrypt from "bcrypt";
 
 const UserSchema = new Schema(
   {
@@ -19,6 +18,11 @@ const UserSchema = new Schema(
       required: [true, "Password is required"],
       minlength: [6, "Password must be at least 6 characters"],
     },
+    favoriteCategories: {
+      type: [Schema.Types.ObjectId],
+      ref: "Category",
+      default: [],
+    },
     isAdmin: {
       type: Boolean,
       default: false,
@@ -28,3 +32,10 @@ const UserSchema = new Schema(
 );
 
 export const User = models.User || model("User", UserSchema);
+
+export type IUser = {
+  _id: string;
+  email: string;
+  password: string;
+  favoriteCategories: string[];
+};

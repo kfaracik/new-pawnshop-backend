@@ -87,6 +87,36 @@ const getNewProducts = async (
   }
 };
 
+const getSuggestedProducts = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = req.query.userId as string;
+    const suggestions = await ProductService.getSuggestedProducts(userId);
+
+    res.status(200).json(suggestions);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getPopularProducts = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const limit = parseInt(req.query.limit as string, 10) || 10;
+    const popularProducts = await ProductService.getPopularProducts(limit);
+
+    res.status(200).json(popularProducts);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const createProduct = async (
   req: Request,
   res: Response,
@@ -139,6 +169,8 @@ export default {
   getAllProducts,
   getProduct,
   getNewProducts,
+  getSuggestedProducts,
+  getPopularProducts,
   searchProducts,
   createProduct,
   updateProduct,

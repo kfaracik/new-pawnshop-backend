@@ -1,11 +1,17 @@
 import { Product } from "../models/productModel";
+import { Types } from "mongoose";
+import { IUser, User } from "../models/userModel";
 
 const getProducts = async (skip: number, limit: number) => {
-  return await Product.find().skip(skip).limit(limit);
+  return await Product.find({}, null, {
+    skip,
+    limit,
+    sort: { createdAt: -1 },
+  }).exec();
 };
 
 const getProduct = async (id: string) => {
-  return await Product.findById(id);
+  return await Product.findById(id).populate("category", "name").exec();
 };
 
 const getTotalProducts = async () => {
@@ -14,15 +20,26 @@ const getTotalProducts = async () => {
 
 const getNewProducts = async () => {
   return await Product.find({}, null, {
-    sort: { _id: -1 },
+    sort: { createdAt: -1 },
     limit: 8,
-  });
+  }).exec();
 };
 
 const searchProducts = async (query: string, skip: number, limit: number) => {
-  const filter = query ? { title: { $regex: query, $options: "i" } } : {};
+  const filter = query
+    ? {
+        $or: [
+          { title: { $regex: query, $options: "i" } },
+          { description: { $regex: query, $options: "i" } },
+        ],
+      }
+    : {};
 
-  const productsPromise = Product.find(filter).skip(skip).limit(limit).exec();
+  const productsPromise = Product.find(filter)
+    .skip(skip)
+    .limit(limit)
+    .sort({ createdAt: -1 })
+    .exec();
   const totalProductsPromise = Product.countDocuments(filter).exec();
 
   const [products, totalProducts] = await Promise.all([
@@ -33,29 +50,90 @@ const searchProducts = async (query: string, skip: number, limit: number) => {
   return { products, totalProducts };
 };
 
-const createProduct = async (productData: { name: string; price: number }) => {
+const createProduct = async (productData: {
+  title: string;
+  description?: string;
+  price: number;
+  images: string[];
+  category: string;
+  stock: number;
+  isAuction?: boolean;
+  auctionLink?: string | null;
+}) => {
   const product = new Product(productData);
   return await product.save();
 };
 
 const updateProduct = async (
   productId: string,
-  productData: { name: string; price: number }
+  productData: {
+    title?: string;
+    description?: string;
+    price?: number;
+    images?: string[];
+    category?: string;
+    stock?: number;
+    isAuction?: boolean;
+    auctionLink?: string | null;
+  }
 ) => {
-  return await Product.findByIdAndUpdate(productId, productData, { new: true });
+  return await Product.findByIdAndUpdate(productId, productData, {
+    new: true,
+  }).exec();
 };
 
 const deleteProduct = async (productId: string) => {
-  return await Product.findByIdAndDelete(productId);
+  return await Product.findByIdAndDelete(productId).exec();
+};
+
+const getSuggestedProducts = async (userId?: string) => {
+  try {
+    let favoriteCategories: string[] = [];
+
+    if (userId) {
+      const user = await User.findById(userId)
+        .select("favoriteCategories")
+        .lean<IUser>();
+
+      favoriteCategories = user?.favoriteCategories || [];
+    }
+
+    const query = favoriteCategories.length
+      ? {
+          category: {
+            $in: favoriteCategories.map((cat) => new Types.ObjectId(cat)),
+          },
+          // stock: { $gt: 0 }, // TODO: Produkty muszą być dostępne w magazynie
+        }
+      : {
+          // stock: { $gt: 0 } // TODO: Produkty muszą być dostępne w magazynie
+        };
+
+    return await Product.find(query).sort({ createdAt: -1 }).limit(8).exec();
+  } catch (error) {
+    console.error("Error in getSuggestedProducts:", error);
+    throw new Error("Failed to fetch suggested products.");
+  }
+};
+
+const getPopularProducts = async (limit: number) => {
+  return await Product.find({
+    // stock: { $gt: 0 }, // TODO: Produkty muszą być dostępne w magazynie
+  })
+    .sort({ price: -1 })
+    .limit(limit)
+    .exec();
 };
 
 export default {
   getProducts,
   getProduct,
   getTotalProducts,
-  searchProducts,
   getNewProducts,
+  searchProducts,
   createProduct,
   updateProduct,
   deleteProduct,
+  getSuggestedProducts,
+  getPopularProducts,
 };
