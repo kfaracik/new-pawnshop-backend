@@ -103,9 +103,11 @@ const getSuggestedProducts = async (userId?: string) => {
           category: {
             $in: favoriteCategories.map((cat) => new Types.ObjectId(cat)),
           },
-          stock: { $gt: 0 },
+          // stock: { $gt: 0 }, // TODO: Produkty muszą być dostępne w magazynie
         }
-      : { stock: { $gt: 0 } };
+      : {
+          // stock: { $gt: 0 } // TODO: Produkty muszą być dostępne w magazynie
+        };
 
     return await Product.find(query).sort({ createdAt: -1 }).limit(8).exec();
   } catch (error) {
