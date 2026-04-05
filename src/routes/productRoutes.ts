@@ -1,6 +1,7 @@
 import { Router } from "express";
 import productController from "../controllers/productController";
 import { isAdmin } from "../middlewares/authAdmin";
+import { authenticateUser } from "../middlewares/authenticateUser";
 
 const router = Router();
 
@@ -373,8 +374,13 @@ router.get("/suggested", productController.getSuggestedProducts);
 router.get("/popular", productController.getPopularProducts);
 router.get("/search", productController.searchProducts);
 router.get("/:id", productController.getProduct);
-router.post("/", isAdmin, productController.createProduct);
-router.put("/:id", isAdmin, productController.updateProduct);
-router.delete("/:id", isAdmin, productController.deleteProduct);
+router.post("/", authenticateUser, isAdmin, productController.createProduct);
+router.put("/:id", authenticateUser, isAdmin, productController.updateProduct);
+router.delete(
+  "/:id",
+  authenticateUser,
+  isAdmin,
+  productController.deleteProduct
+);
 
 export default router;

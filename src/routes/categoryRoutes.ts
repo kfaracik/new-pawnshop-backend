@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { isAdmin } from "../middlewares/authAdmin";
+import { authenticateUser } from "../middlewares/authenticateUser";
 import categoryController from "../controllers/categoryController";
 
 const router = Router();
@@ -141,8 +142,14 @@ const router = Router();
  */
 
 router.get("/", categoryController.getAllCategories);
-router.post("/", isAdmin, categoryController.createCategory);
-router.put("/:id", isAdmin, categoryController.updateCategory);
-router.delete("/:id", isAdmin, categoryController.deleteCategory);
+router.get("/tree", categoryController.getCategoryTree);
+router.post("/", authenticateUser, isAdmin, categoryController.createCategory);
+router.put("/:id", authenticateUser, isAdmin, categoryController.updateCategory);
+router.delete(
+  "/:id",
+  authenticateUser,
+  isAdmin,
+  categoryController.deleteCategory
+);
 
 export default router;

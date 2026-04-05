@@ -1,6 +1,7 @@
 import { Router } from "express";
 import orderController from "../controllers/orderController";
 import { isAdmin } from "../middlewares/authAdmin";
+import { authenticateUser } from "../middlewares/authenticateUser";
 
 const router = Router();
 
@@ -200,9 +201,9 @@ const router = Router();
  *           format: date-time
  */
 
-router.get("/", isAdmin, orderController.getAllOrders);
-router.post("/", orderController.createOrder);
-router.put("/:id", isAdmin, orderController.updateOrder);
-router.delete("/:id", isAdmin, orderController.deleteOrder);
+router.get("/", authenticateUser, isAdmin, orderController.getAllOrders);
+router.post("/", authenticateUser, orderController.createOrder);
+router.put("/:id", authenticateUser, isAdmin, orderController.updateOrder);
+router.delete("/:id", authenticateUser, isAdmin, orderController.deleteOrder);
 
 export default router;

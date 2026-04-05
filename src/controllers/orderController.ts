@@ -1,9 +1,9 @@
-import { Request, Response, NextFunction } from 'express';
-import { Order } from '../models/orderModel';
+import { Request, Response, NextFunction } from "express";
+import { Order } from "../models/orderModel";
 
 const getAllOrders = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const orders = await Order.find().populate('userId').populate('products.productId');
+    const orders = await Order.find().populate("userId");
     res.status(200).json(orders);
   } catch (error) {
     next(error);
@@ -12,13 +12,18 @@ const getAllOrders = async (req: Request, res: Response, next: NextFunction) => 
 
 const createOrder = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { userId, products, totalAmount } = req.body;
+    const { products, totalAmount } = req.body;
+    const authenticatedUserId = req.user?._id;
+
+    if (!authenticatedUserId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
     const newOrder = new Order({
-      userId,
+      userId: authenticatedUserId,
       products,
       totalAmount,
-      status: 'pending',
+      status: "pending",
     });
 
     await newOrder.save();
@@ -33,10 +38,10 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const order = await Order.findByIdAndUpdate(id, { status }, { new: true });
+    const order = await Order.findByIdAndUpdate(id, { status }, { new: true, runValidators: true });
 
     if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
+      return res.status(404).json({ message: "Order not found" });
     }
 
     res.status(200).json(order);
@@ -52,10 +57,10 @@ const deleteOrder = async (req: Request, res: Response, next: NextFunction) => {
     const order = await Order.findByIdAndDelete(id);
 
     if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
+      return res.status(404).json({ message: "Order not found" });
     }
 
-    res.status(200).json({ message: 'Order deleted successfully' });
+    res.status(200).json({ message: "Order deleted successfully" });
   } catch (error) {
     next(error);
   }
