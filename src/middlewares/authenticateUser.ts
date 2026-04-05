@@ -3,9 +3,20 @@ import { User } from "../models/userModel";
 
 export const authenticateUser = async (req, res, next) => {
   const token = req.header("Authorization")?.replace("Bearer ", "");
+  const serviceAdminToken = process.env.AUCTION_ADMIN_TOKEN;
 
   if (!token) {
     return res.status(401).json({ message: "No token provided" });
+  }
+
+  // Allow trusted server-to-server admin calls (e.g. admin panel proxy).
+  if (serviceAdminToken && token === serviceAdminToken) {
+    req.user = {
+      _id: "service-admin",
+      email: "service-admin@internal.local",
+      isAdmin: true,
+    };
+    return next();
   }
 
   try {

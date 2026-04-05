@@ -142,7 +142,7 @@ const createAuction = async (req: Request, res: Response, next: NextFunction) =>
     });
 
     product.isAuction = true;
-    product.auctionLink = `/auctions/${auction._id}`;
+    product.auctionLink = `/product/${productId}`;
     await product.save();
 
     const created = await Auction.findById(auction._id).populate("productId").lean();
