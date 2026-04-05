@@ -47,6 +47,11 @@ const ProductSchema = new Schema(
         message: "Auction link is required for auction products",
       },
     },
+    quantity: {
+      type: Number,
+      default: undefined,
+      min: [0, "Quantity cannot be negative"],
+    },
     stock: {
       type: Number,
       default: 0,

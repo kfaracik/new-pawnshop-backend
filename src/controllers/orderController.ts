@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { Order } from "../models/orderModel";
 import { Product } from "../models/productModel";
 
@@ -16,7 +16,39 @@ const getAllOrders = async (req: Request, res: Response, next: NextFunction) => 
   }
 };
 
+const getMyOrders = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user?._id && !user?.email) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const filter: any = {
+      $or: [],
+    };
+
+    if (user?._id && Types.ObjectId.isValid(String(user._id))) {
+      filter.$or.push({ userId: user._id });
+    }
+
+    if (user?.email) {
+      filter.$or.push({ "customer.email": String(user.email).toLowerCase() });
+    }
+
+    if (!filter.$or.length) {
+      return res.status(200).json([]);
+    }
+
+    const orders = await Order.find(filter).sort({ createdAt: -1 }).lean();
+    return res.status(200).json(orders);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const createOrder = async (req: Request, res: Response, next: NextFunction) => {
+  const session = await mongoose.startSession();
+
   try {
     const { name, email, city, postalCode, streetAddress, country, products } = req.body || {};
 
@@ -42,54 +74,120 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const uniqueProductIds = [...new Set(normalizedProducts.map((item: any) => item.productId))];
-    const dbProducts = await Product.find({ _id: { $in: uniqueProductIds } })
-      .select("_id title price")
-      .lean<any[]>();
 
-    const productsById = new Map(dbProducts.map((p) => [String(p._id), p]));
+    let createdOrder: any = null;
 
-    const orderProducts = normalizedProducts.map((item: any) => {
-      const dbProduct = productsById.get(item.productId);
-      if (!dbProduct) return null;
+    await session.withTransaction(async () => {
+      const dbProducts = await Product.find({ _id: { $in: uniqueProductIds } })
+        .select("_id title price quantity")
+        .session(session)
+        .lean<any[]>();
 
-      return {
-        productId: dbProduct._id,
-        name: dbProduct.title,
-        price: Number(dbProduct.price),
-        quantity: item.quantity,
-      };
+      const productsById = new Map(dbProducts.map((p) => [String(p._id), p]));
+
+      const orderProducts: Array<{ productId: any; name: string; price: number; quantity: number }> = [];
+
+      for (const item of normalizedProducts) {
+        const dbProduct = productsById.get(item.productId);
+
+        if (!dbProduct) {
+          throw new Error("ORDER_PRODUCT_NOT_FOUND");
+        }
+
+        const availableQuantity = Number(dbProduct.quantity);
+        if (!Number.isFinite(availableQuantity) || availableQuantity < item.quantity) {
+          throw new Error("ORDER_INSUFFICIENT_QUANTITY");
+        }
+
+        const updated = await Product.findOneAndUpdate(
+          {
+            _id: new Types.ObjectId(item.productId),
+            quantity: { $gte: item.quantity },
+          },
+          {
+            $inc: { quantity: -item.quantity },
+          },
+          {
+            new: true,
+            session,
+          }
+        );
+
+        if (!updated) {
+          throw new Error("ORDER_QUANTITY_RACE_CONDITION");
+        }
+
+        orderProducts.push({
+          productId: dbProduct._id,
+          name: dbProduct.title,
+          price: Number(dbProduct.price),
+          quantity: item.quantity,
+        });
+      }
+
+      const totalAmount = orderProducts.reduce(
+        (sum, item) => sum + Number(item.price) * Number(item.quantity),
+        0
+      );
+
+      const [newOrder] = await Order.create(
+        [
+          {
+            userId: req.user?._id && Types.ObjectId.isValid(String(req.user._id)) ? req.user._id : null,
+            customer: {
+              name,
+              email: String(email).toLowerCase(),
+              city,
+              postalCode,
+              streetAddress,
+              country,
+            },
+            products: orderProducts,
+            totalAmount,
+            orderStatus: "pending_payment",
+            paymentStatus: "unpaid",
+            paid: false,
+          },
+        ],
+        { session }
+      );
+
+      createdOrder = newOrder;
     });
 
-    if (orderProducts.some((item: any) => !item)) {
+    return res.status(201).json(createdOrder);
+  } catch (error: any) {
+    if (error?.message === "ORDER_PRODUCT_NOT_FOUND") {
       return res.status(404).json({ message: "One or more ordered products were not found" });
     }
 
-    const totalAmount = orderProducts.reduce(
-      (sum: number, item: any) => sum + Number(item.price) * Number(item.quantity),
-      0
-    );
+    if (
+      error?.message === "ORDER_INSUFFICIENT_QUANTITY" ||
+      error?.message === "ORDER_QUANTITY_RACE_CONDITION"
+    ) {
+      return res.status(409).json({
+        message:
+          "One or more products are no longer available in requested quantity. Refresh your cart and try again.",
+      });
+    }
 
-    const newOrder = new Order({
-      userId: req.user?._id || null,
-      customer: { name, email, city, postalCode, streetAddress, country },
-      products: orderProducts,
-      totalAmount,
-      status: "pending",
-    });
-
-    await newOrder.save();
-    res.status(201).json(newOrder);
-  } catch (error) {
     next(error);
+  } finally {
+    await session.endSession();
   }
 };
 
 const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { orderStatus, paymentStatus, paid } = req.body || {};
 
-    const order = await Order.findByIdAndUpdate(id, { status }, { new: true, runValidators: true });
+    const update: Record<string, unknown> = {};
+    if (orderStatus) update.orderStatus = orderStatus;
+    if (paymentStatus) update.paymentStatus = paymentStatus;
+    if (typeof paid === "boolean") update.paid = paid;
+
+    const order = await Order.findByIdAndUpdate(id, update, { new: true, runValidators: true });
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -119,6 +217,7 @@ const deleteOrder = async (req: Request, res: Response, next: NextFunction) => {
 
 export default {
   getAllOrders,
+  getMyOrders,
   createOrder,
   updateOrder,
   deleteOrder,

@@ -109,6 +109,51 @@ const getAuctionBids = async (req: Request, res: Response, next: NextFunction) =
   }
 };
 
+const getMyAuctionParticipations = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId || !Types.ObjectId.isValid(String(userId))) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const userBids = await Bid.find({ userId })
+      .sort({ createdAt: -1 })
+      .lean<any[]>();
+
+    if (!userBids.length) {
+      return res.status(200).json([]);
+    }
+
+    const auctionIds = [...new Set(userBids.map((bid) => String(bid.auctionId)))];
+    const auctions = await Auction.find({ _id: { $in: auctionIds } })
+      .populate("productId", "_id title images")
+      .sort({ createdAt: -1 })
+      .lean<any[]>();
+
+    const highestBidByAuction = new Map<string, number>();
+    for (const bid of userBids) {
+      const auctionId = String(bid.auctionId);
+      const previous = highestBidByAuction.get(auctionId) ?? 0;
+      if (Number(bid.amount) > previous) {
+        highestBidByAuction.set(auctionId, Number(bid.amount));
+      }
+    }
+
+    const response = auctions.map((auction) => ({
+      ...auction,
+      myHighestBid: highestBidByAuction.get(String(auction._id)) ?? null,
+    }));
+
+    return res.status(200).json(response);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const createAuction = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationError = validateAuctionPayload(req.body);
@@ -432,6 +477,7 @@ export default {
   getAllAuctions,
   getAuctionById,
   getAuctionBids,
+  getMyAuctionParticipations,
   createAuction,
   updateAuction,
   deleteAuction,

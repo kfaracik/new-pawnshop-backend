@@ -35,11 +35,17 @@ const OrderSchema = new Schema(
       required: true,
     },
     totalAmount: { type: Number, required: true, min: 0 },
-    status: {
+    orderStatus: {
       type: String,
-      enum: ["pending", "completed", "cancelled"],
-      default: "pending",
+      enum: ["pending_payment", "paid", "completed", "canceled", "failed"],
+      default: "pending_payment",
     },
+    paymentStatus: {
+      type: String,
+      enum: ["unpaid", "pending", "paid", "failed", "canceled", "refunded"],
+      default: "unpaid",
+    },
+    paid: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

@@ -57,6 +57,7 @@ const createProduct = async (productData: {
   images: string[];
   category: string;
   stock: number;
+  quantity?: number;
   isAuction?: boolean;
   auctionLink?: string | null;
 }) => {
@@ -73,6 +74,7 @@ const updateProduct = async (
     images?: string[];
     category?: string;
     stock?: number;
+    quantity?: number;
     isAuction?: boolean;
     auctionLink?: string | null;
   }

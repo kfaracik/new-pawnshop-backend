@@ -232,6 +232,11 @@ const router = Router();
  */
 
 router.get("/", auctionController.getAllAuctions);
+router.get(
+  "/my/participations",
+  authenticateUser,
+  auctionController.getMyAuctionParticipations
+);
 router.get("/:id", auctionController.getAuctionById);
 router.get("/:id/bids", auctionController.getAuctionBids);
 router.get("/:id/stream", auctionController.streamAuctionEvents);

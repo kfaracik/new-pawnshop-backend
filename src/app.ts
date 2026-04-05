@@ -41,6 +41,7 @@ app.use("/api/v1/auctions", auctionRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/category", categoryRoutes);
+app.use("/api/categories", categoryRoutes);
 app.use("/api/order", orderRoutes);
 app.use("/api/auctions", auctionRoutes);
 
