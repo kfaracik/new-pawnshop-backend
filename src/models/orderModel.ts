@@ -46,6 +46,7 @@ const OrderSchema = new Schema(
       default: "unpaid",
     },
     paid: { type: Boolean, default: false },
+    reservationExpiresAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

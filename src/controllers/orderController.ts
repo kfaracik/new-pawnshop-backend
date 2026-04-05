@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import mongoose, { Types } from "mongoose";
 import { Order } from "../models/orderModel";
 import { Product } from "../models/productModel";
+import { getReservationExpiresAt } from "../services/orderReservationService";
 
 const getAllOrders = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -23,9 +24,7 @@ const getMyOrders = async (req: Request, res: Response, next: NextFunction) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const filter: any = {
-      $or: [],
-    };
+    const filter: any = { $or: [] };
 
     if (user?._id && Types.ObjectId.isValid(String(user._id))) {
       filter.$or.push({ userId: user._id });
@@ -48,6 +47,7 @@ const getMyOrders = async (req: Request, res: Response, next: NextFunction) => {
 
 const createOrder = async (req: Request, res: Response, next: NextFunction) => {
   const session = await mongoose.startSession();
+  const unavailableProducts: string[] = [];
 
   try {
     const { name, email, city, postalCode, streetAddress, country, products } = req.body || {};
@@ -74,7 +74,6 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const uniqueProductIds = [...new Set(normalizedProducts.map((item: any) => item.productId))];
-
     let createdOrder: any = null;
 
     await session.withTransaction(async () => {
@@ -84,19 +83,20 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
         .lean<any[]>();
 
       const productsById = new Map(dbProducts.map((p) => [String(p._id), p]));
-
       const orderProducts: Array<{ productId: any; name: string; price: number; quantity: number }> = [];
 
       for (const item of normalizedProducts) {
         const dbProduct = productsById.get(item.productId);
 
         if (!dbProduct) {
-          throw new Error("ORDER_PRODUCT_NOT_FOUND");
+          unavailableProducts.push(item.productId);
+          continue;
         }
 
         const availableQuantity = Number(dbProduct.quantity);
         if (!Number.isFinite(availableQuantity) || availableQuantity < item.quantity) {
-          throw new Error("ORDER_INSUFFICIENT_QUANTITY");
+          unavailableProducts.push(String(dbProduct._id));
+          continue;
         }
 
         const updated = await Product.findOneAndUpdate(
@@ -114,7 +114,8 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
         );
 
         if (!updated) {
-          throw new Error("ORDER_QUANTITY_RACE_CONDITION");
+          unavailableProducts.push(String(dbProduct._id));
+          continue;
         }
 
         orderProducts.push({
@@ -123,6 +124,10 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
           price: Number(dbProduct.price),
           quantity: item.quantity,
         });
+      }
+
+      if (unavailableProducts.length > 0) {
+        throw new Error("ORDER_UNAVAILABLE_PRODUCTS");
       }
 
       const totalAmount = orderProducts.reduce(
@@ -147,6 +152,7 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
             orderStatus: "pending_payment",
             paymentStatus: "unpaid",
             paid: false,
+            reservationExpiresAt: getReservationExpiresAt(),
           },
         ],
         { session }
@@ -157,17 +163,11 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
 
     return res.status(201).json(createdOrder);
   } catch (error: any) {
-    if (error?.message === "ORDER_PRODUCT_NOT_FOUND") {
-      return res.status(404).json({ message: "One or more ordered products were not found" });
-    }
-
-    if (
-      error?.message === "ORDER_INSUFFICIENT_QUANTITY" ||
-      error?.message === "ORDER_QUANTITY_RACE_CONDITION"
-    ) {
+    if (error?.message === "ORDER_UNAVAILABLE_PRODUCTS") {
       return res.status(409).json({
         message:
-          "One or more products are no longer available in requested quantity. Refresh your cart and try again.",
+          "Niektóre produkty z koszyka są już niedostępne lub zarezerwowane przez innego użytkownika.",
+        unavailableProductIds: [...new Set(unavailableProducts)],
       });
     }
 

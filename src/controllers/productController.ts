@@ -9,11 +9,12 @@ const getAllProducts = async (
   try {
     const page = parseInt(req.query.page as string, 10) || 1;
     const limit = parseInt(req.query.limit as string, 10) || 10;
+    const category = (req.query.category as string) || "";
     const skip = (page - 1) * limit;
 
     const [products, total] = await Promise.all([
-      ProductService.getProducts(skip, limit),
-      ProductService.getTotalProducts(),
+      ProductService.getProducts(skip, limit, category),
+      ProductService.getTotalProducts(category),
     ]);
 
     res.status(200).json({

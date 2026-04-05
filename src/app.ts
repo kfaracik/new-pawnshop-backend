@@ -7,6 +7,7 @@ import orderRoutes from "./routes/orderRoutes";
 import categoryRoutes from "./routes/categoryRoutes";
 import auctionRoutes from "./routes/auctionRoutes";
 import { startAuctionScheduler } from "./services/auctionService";
+import { startOrderReservationScheduler } from "./services/orderReservationService";
 
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("../swaggerConfig");
@@ -17,6 +18,7 @@ app.use(express.json());
 
 connectDB();
 startAuctionScheduler();
+startOrderReservationScheduler();
 
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
