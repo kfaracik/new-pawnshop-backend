@@ -4,6 +4,28 @@ import { Order } from "../models/orderModel";
 import { Product } from "../models/productModel";
 import { getReservationExpiresAt } from "../services/orderReservationService";
 
+const TERMINAL_ORDER_STATUSES = new Set(["completed", "canceled", "failed"]);
+const STOCK_RESTORE_ORDER_STATUSES = new Set(["canceled", "failed"]);
+const PAID_PAYMENT_STATUSES = new Set(["paid"]);
+const UNPAID_PAYMENT_STATUSES = new Set(["unpaid", "failed", "canceled"]);
+
+const normalizeCustomerField = (value: unknown) => String(value || "").trim();
+
+const mergeOrderProducts = (products: any[]) => {
+  const merged = new Map<string, number>();
+
+  for (const item of products) {
+    const productId = String(item?.productId || "");
+    const quantity = Number(item?.quantity || 0);
+    merged.set(productId, Number(merged.get(productId) || 0) + quantity);
+  }
+
+  return [...merged.entries()].map(([productId, quantity]) => ({
+    productId,
+    quantity,
+  }));
+};
+
 const getAllOrders = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orders = await Order.find()
@@ -51,8 +73,23 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
 
   try {
     const { name, email, city, postalCode, streetAddress, country, products } = req.body || {};
+    const normalizedCustomer = {
+      name: normalizeCustomerField(name),
+      email: normalizeCustomerField(email).toLowerCase(),
+      city: normalizeCustomerField(city),
+      postalCode: normalizeCustomerField(postalCode),
+      streetAddress: normalizeCustomerField(streetAddress),
+      country: normalizeCustomerField(country),
+    };
 
-    if (!name || !email || !city || !postalCode || !streetAddress || !country) {
+    if (
+      !normalizedCustomer.name ||
+      !normalizedCustomer.email ||
+      !normalizedCustomer.city ||
+      !normalizedCustomer.postalCode ||
+      !normalizedCustomer.streetAddress ||
+      !normalizedCustomer.country
+    ) {
       return res.status(400).json({ message: "Missing customer details" });
     }
 
@@ -60,7 +97,7 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
       return res.status(400).json({ message: "Order must include at least one product" });
     }
 
-    const normalizedProducts = products.map((item: any) => ({
+    const normalizedProducts = mergeOrderProducts(products).map((item: any) => ({
       productId: String(item?.productId || ""),
       quantity: Number(item?.quantity || 0),
     }));
@@ -139,14 +176,7 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
         [
           {
             userId: req.user?._id && Types.ObjectId.isValid(String(req.user._id)) ? req.user._id : null,
-            customer: {
-              name,
-              email: String(email).toLowerCase(),
-              city,
-              postalCode,
-              streetAddress,
-              country,
-            },
+            customer: normalizedCustomer,
             products: orderProducts,
             totalAmount,
             orderStatus: "pending_payment",
@@ -178,24 +208,81 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
 };
 
 const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
+  const session = await mongoose.startSession();
+
   try {
     const { id } = req.params;
     const { orderStatus, paymentStatus, paid } = req.body || {};
+    let updatedOrder: any = null;
 
-    const update: Record<string, unknown> = {};
-    if (orderStatus) update.orderStatus = orderStatus;
-    if (paymentStatus) update.paymentStatus = paymentStatus;
-    if (typeof paid === "boolean") update.paid = paid;
+    await session.withTransaction(async () => {
+      const order = await Order.findById(id).session(session);
 
-    const order = await Order.findByIdAndUpdate(id, update, { new: true, runValidators: true });
+      if (!order) {
+        throw new Error("ORDER_NOT_FOUND");
+      }
 
-    if (!order) {
+      const previousOrderStatus = order.orderStatus;
+      const previousPaymentStatus = order.paymentStatus;
+      const wasPendingReservation =
+        previousOrderStatus === "pending_payment" && previousPaymentStatus === "unpaid";
+
+      if (orderStatus) {
+        order.orderStatus = orderStatus;
+      }
+
+      if (paymentStatus) {
+        order.paymentStatus = paymentStatus;
+      }
+
+      if (typeof paid === "boolean") {
+        order.paid = paid;
+      }
+
+      if (PAID_PAYMENT_STATUSES.has(order.paymentStatus)) {
+        order.paid = true;
+        if (order.orderStatus === "pending_payment") {
+          order.orderStatus = "paid";
+        }
+        order.reservationExpiresAt = null;
+      } else if (UNPAID_PAYMENT_STATUSES.has(order.paymentStatus) && typeof paid !== "boolean") {
+        order.paid = false;
+      }
+
+      if (TERMINAL_ORDER_STATUSES.has(order.orderStatus)) {
+        order.reservationExpiresAt = null;
+      }
+
+      const shouldRestoreStock =
+        wasPendingReservation &&
+        STOCK_RESTORE_ORDER_STATUSES.has(order.orderStatus) &&
+        !STOCK_RESTORE_ORDER_STATUSES.has(previousOrderStatus);
+
+      if (shouldRestoreStock) {
+        for (const product of order.products || []) {
+          await Product.findByIdAndUpdate(
+            product.productId,
+            {
+              $inc: { quantity: Number(product.quantity || 0) },
+            },
+            { session }
+          );
+        }
+      }
+
+      await order.save({ session });
+      updatedOrder = order.toObject();
+    });
+
+    res.status(200).json(updatedOrder);
+  } catch (error) {
+    if ((error as Error)?.message === "ORDER_NOT_FOUND") {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    res.status(200).json(order);
-  } catch (error) {
     next(error);
+  } finally {
+    await session.endSession();
   }
 };
 
