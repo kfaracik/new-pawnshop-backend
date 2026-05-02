@@ -1,8 +1,20 @@
 import { Request, Response, NextFunction } from "express";
+import { logError } from "../utils/logger";
 
-const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ message: err.message });
+type ApiError = Error & {
+  statusCode?: number;
+};
+
+const errorHandler = (err: ApiError, _req: Request, res: Response, _next: NextFunction) => {
+  const statusCode = err.statusCode || 500;
+  logError("request_failed", {
+    statusCode,
+    message: err.message,
+    stack: err.stack,
+  });
+  res.status(statusCode).json({
+    message: statusCode === 500 ? "Internal server error" : err.message,
+  });
 };
 
 export default errorHandler;

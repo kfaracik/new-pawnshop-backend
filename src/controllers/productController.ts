@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import ProductService from "../services/productService";
+import { getSingleValue } from "../utils/request";
+import { logAudit, logError } from "../utils/logger";
 
 const getAllProducts = async (
   req: Request,
@@ -30,7 +32,10 @@ const getAllProducts = async (
 
 const getProduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = getSingleValue(req.params.id);
+    if (!id) {
+      return res.status(400).json({ error: "Product id is required" });
+    }
     const product = await ProductService.getProduct(id);
 
     if (!product) {
@@ -39,7 +44,10 @@ const getProduct = async (req: Request, res: Response, next: NextFunction) => {
 
     res.status(200).json(product);
   } catch (error) {
-    console.error("Error fetching product:", error);
+    logError("product_fetch_failed", {
+      error: error instanceof Error ? error.message : String(error),
+      productId: req.params.id,
+    });
     next(error);
   }
 };
@@ -70,7 +78,10 @@ const searchProducts = async (
       },
     });
   } catch (error) {
-    console.error(error);
+    logError("product_search_failed", {
+      error: error instanceof Error ? error.message : String(error),
+      query: req.query.query,
+    });
     next(error);
   }
 };
@@ -94,7 +105,7 @@ const getSuggestedProducts = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.query.userId as string;
+    const userId = getSingleValue(req.query.userId as string | string[] | undefined) || "";
     const suggestions = await ProductService.getSuggestedProducts(userId);
 
     res.status(200).json(suggestions);
@@ -125,6 +136,11 @@ const createProduct = async (
 ) => {
   try {
     const newProduct = await ProductService.createProduct(req.body);
+    logAudit("product_created", {
+      productId: newProduct?._id,
+      userId: req.user?._id,
+      title: newProduct?.title,
+    });
     res.status(201).json(newProduct);
   } catch (error) {
     next(error);
@@ -137,13 +153,22 @@ const updateProduct = async (
   next: NextFunction
 ) => {
   try {
+    const id = getSingleValue(req.params.id);
+    if (!id) {
+      return res.status(400).json({ message: "Product id is required" });
+    }
     const updatedProduct = await ProductService.updateProduct(
-      req.params.id,
+      id,
       req.body
     );
     if (!updatedProduct) {
       return res.status(404).json({ message: "Product not found" });
     }
+    logAudit("product_updated", {
+      productId: updatedProduct?._id,
+      userId: req.user?._id,
+      title: updatedProduct?.title,
+    });
     res.status(200).json(updatedProduct);
   } catch (error) {
     next(error);
@@ -156,10 +181,20 @@ const deleteProduct = async (
   next: NextFunction
 ) => {
   try {
-    const deletedProduct = await ProductService.deleteProduct(req.params.id);
+    const id = getSingleValue(req.params.id);
+    if (!id) {
+      return res.status(400).json({ message: "Product id is required" });
+    }
+
+    const deletedProduct = await ProductService.deleteProduct(id);
     if (!deletedProduct) {
       return res.status(404).json({ message: "Product not found" });
     }
+    logAudit("product_deleted", {
+      productId: deletedProduct?._id,
+      userId: req.user?._id,
+      title: deletedProduct?.title,
+    });
     res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {
     next(error);

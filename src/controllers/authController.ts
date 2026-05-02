@@ -1,8 +1,20 @@
+import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { User } from "../models/userModel";
+import { env } from "../config/env";
+import { logError } from "../utils/logger";
 
-export const getUserData = async (req, res) => {
+type JwtPayload = {
+  id?: string;
+};
+
+const createToken = (userId: string) =>
+  jwt.sign({ id: userId }, env.jwtSecret, {
+    expiresIn: "7d",
+  });
+
+export const getUserData = async (req: Request, res: Response) => {
   try {
     const token = req.header("Authorization")?.replace("Bearer ", "");
 
@@ -10,7 +22,7 @@ export const getUserData = async (req, res) => {
       return res.status(401).json({ message: "No token provided" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, env.jwtSecret) as JwtPayload;
 
     const user = await User.findById(decoded.id);
 
@@ -24,14 +36,21 @@ export const getUserData = async (req, res) => {
       name: user.name,
     });
   } catch (err) {
-    console.error("Error fetching user data:", err);
+    logError("auth_me_failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     res.status(500).json({ message: "Server error" });
   }
 };
 
-export const register = async (req, res, next) => {
+export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
@@ -42,9 +61,7 @@ export const register = async (req, res, next) => {
     const user = new User({ email, password: hashedPassword });
     await user.save();
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
+    const token = createToken(String(user._id));
 
     res.status(201).json({
       message: "User registered successfully",
@@ -55,9 +72,14 @@ export const register = async (req, res, next) => {
   }
 };
 
-export const login = async (req, res, next) => {
+export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
     const user = await User.findOne({ email });
 
     if (!user) {
@@ -70,9 +92,7 @@ export const login = async (req, res, next) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
+    const token = createToken(String(user._id));
 
     res.status(200).json({
       message: "Login successful",

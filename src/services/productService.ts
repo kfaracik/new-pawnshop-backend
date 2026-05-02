@@ -2,6 +2,9 @@ import { Product } from "../models/productModel";
 import { Types } from "mongoose";
 import { IUser, User } from "../models/userModel";
 import { Order } from "../models/orderModel";
+import { sanitizeHtml } from "../utils/html";
+import { buildSearchRegex } from "../utils/search";
+import { logError } from "../utils/logger";
 
 const enrichProductsWithAvailability = async (products: any[]) => {
   if (!Array.isArray(products) || products.length === 0) return [];
@@ -56,6 +59,10 @@ const enrichProductsWithAvailability = async (products: any[]) => {
       ...plain,
       availabilityStatus,
       reservationExpiresAt,
+      availabilityMode: plain?.availabilityMode || "online_only",
+      availableLocations: Array.isArray(plain?.availableLocations)
+        ? plain.availableLocations
+        : [],
     };
   });
 };
@@ -101,11 +108,12 @@ const getNewProducts = async () => {
 };
 
 const searchProducts = async (query: string, skip: number, limit: number) => {
-  const filter = query
+  const safeRegex = buildSearchRegex(query);
+  const filter = safeRegex
     ? {
         $or: [
-          { title: { $regex: query, $options: "i" } },
-          { description: { $regex: query, $options: "i" } },
+          { title: safeRegex },
+          { description: safeRegex },
         ],
       }
     : {};
@@ -137,8 +145,13 @@ const createProduct = async (productData: {
   quantity?: number;
   isAuction?: boolean;
   auctionLink?: string | null;
+  availabilityMode?: string;
+  availableLocations?: string[];
 }) => {
-  const product = new Product(productData);
+  const product = new Product({
+    ...productData,
+    description: sanitizeHtml(productData.description),
+  });
   return await product.save();
 };
 
@@ -154,9 +167,18 @@ const updateProduct = async (
     quantity?: number;
     isAuction?: boolean;
     auctionLink?: string | null;
+    availabilityMode?: string;
+    availableLocations?: string[];
   }
 ) => {
-  return await Product.findByIdAndUpdate(productId, productData, {
+  const normalizedProductData = {
+    ...productData,
+    ...(productData.description !== undefined
+      ? { description: sanitizeHtml(productData.description) }
+      : {}),
+  };
+
+  return await Product.findByIdAndUpdate(productId, normalizedProductData, {
     new: true,
   }).exec();
 };
@@ -188,7 +210,10 @@ const getSuggestedProducts = async (userId?: string) => {
     const products = await Product.find(query).sort({ createdAt: -1 }).limit(8).exec();
     return enrichProductsWithAvailability(products as any[]);
   } catch (error) {
-    console.error("Error in getSuggestedProducts:", error);
+    logError("suggested_products_failed", {
+      error: error instanceof Error ? error.message : String(error),
+      userId,
+    });
     throw new Error("Failed to fetch suggested products.");
   }
 };

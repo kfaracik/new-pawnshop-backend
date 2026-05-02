@@ -1,190 +1,69 @@
-# **New Pawnshop Backend **
+# New Pawnshop Backend
 
-## **Overview**
-The **New Pawnshop Backend** is a robust server application designed to manage the backend functionality of a modern pawnshop platform. Built using **Node.js**, **Express**, and **MongoDB**, it incorporates features such as user authentication, secure data handling, and API documentation for seamless integration with client applications.
+Express API for `new-pawnshop-front` and `new-pawnshop-admin`.
 
-This documentation provides a comprehensive guide to the project's structure, key dependencies, and functionality.
+## Current state
 
----
+- TypeScript build and runtime scripts are configured.
+- Environment variables are validated on startup.
+- `helmet`, CORS allowlist and rate limiting are enabled.
+- Auth controller validates basic input and hides internal 500 messages.
+- Backward-compatible routes are still exposed for existing clients.
 
-## **Deployed Application**
-The backend project is deployed and accessible via the following link:
-**[Deployed Backend API](https://new-pawnshop-backend.onrender.com/docs/#/)**
+## Architecture
 
-> **Note:** For security, production endpoints may require authentication. Obtain API keys or credentials from the administrator.
+- The backend is closer to a service-layer architecture than to a true feature-based one.
+- Current folders are technical layers: `controllers`, `routes`, `services`, `models`, `middlewares`.
+- Shared request parsing now lives in `src/utils/request.ts` to reduce duplication across controllers.
+- Recommended next step is to group code by domains such as `auth`, `products`, `categories`, `orders`, `auctions`, each with route/controller/service/model modules.
 
----
-
-## **Project Structure**
-
-The backend is structured for scalability and maintainability. Below is the directory layout:
-
-```
-.
-├── src
-│   ├── controllers
-│   │   └── [Handles business logic for routes]
-│   ├── middlewares
-│   │   └── [Custom middleware such as authentication]
-│   ├── models
-│   │   └── [Mongoose schemas for MongoDB]
-│   ├── routes
-│   │   └── [API route definitions]
-│   ├── utils
-│   │   └── [Utility functions like token generation]
-│   ├── server.ts
-│   │   └── [Application entry point]
-├── .env
-│   └── [Environment variable configuration]
-├── package.json
-│   └── [Project dependencies and scripts]
-└── nodemon.json
-    └── [Nodemon configuration for development]
-```
-
-### **Key Folders**
-
-1. **`controllers/`**
-   - Contains functions implementing the core logic for API endpoints. 
-   - Example: `authController.ts` handles user authentication.
-
-2. **`middlewares/`**
-   - Contains reusable middleware such as request validation and JWT verification.
-   - Example: `authMiddleware.ts` checks the validity of JSON Web Tokens.
-
-3. **`models/`**
-   - Contains Mongoose schemas for managing data in MongoDB.
-   - Example: `User.ts` defines the schema for user data.
-
-4. **`routes/`**
-   - Contains API route definitions organized by functionality.
-   - Example: `userRoutes.ts` includes endpoints like `/login` and `/register`.
-
-5. **`utils/`**
-   - Helper functions for tasks like hashing passwords or generating tokens.
-   - Example: `tokenUtils.ts`.
-
-6. **`server.ts`**
-   - The entry point of the application, initializing Express, middleware, and routes.
-
----
-
-## **Key Features**
-
-### **Authentication**
-- **JWT-based Authentication:** Secure and stateless user session management.
-- **Password Hashing:** User passwords are encrypted using **bcrypt** for security.
-
-### **API Documentation**
-- Integrated **Swagger UI** for endpoint visualization and testing.
-- Visit the documentation at **[Swagger API Docs](https://api.newpawnshop.com/docs)**.
-
-### **Database**
-- MongoDB is used for data storage, managed via **Mongoose**.
-- Example collections:
-  - `users`
-  - `items`
-  - `categories`
-  - `transactions`
-
-### **Cross-Origin Resource Sharing**
-- Configured using **CORS** to allow secure interaction between the backend and the frontend.
-
----
-
-## **Scripts**
-
-### **Development**
-```bash
-npm run start
-```
-- Starts the application using **Nodemon** for hot-reloading.
-
-### **Build**
-```bash
-npm run build
-```
-- Builds the project for production.
-
----
-
-## **Environment Variables**
-
-The project uses environment variables to manage sensitive information. Ensure to configure the following in a `.env` file:
+## Required environment variables
 
 ```env
-PORT=5000
-DB_URL=mongodb+srv://<username>:<password>@cluster.example.com/dbname
-JWT_SECRET=your_jwt_secret
+NODE_ENV=production
+PORT=3000
+MONGODB_URI=mongodb+srv://...
+JWT_SECRET=replace-with-strong-secret
+CORS_ORIGINS=https://shop.example.com,https://admin.example.com
+AUCTION_ADMIN_TOKEN=replace-with-strong-service-token
 ```
 
----
+## Scripts
 
-## **Installation**
+```bash
+npm run dev
+npm run build
+npm run start
+npm run typecheck
+```
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/username/new-pawnshop-backend.git
-   cd new-pawnshop-backend
-   ```
+## Production checklist
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+- Put the API behind HTTPS and a reverse proxy.
+- Store secrets in a real secret manager.
+- Restrict `CORS_ORIGINS` to exact production domains.
+- Rotate `JWT_SECRET` and `AUCTION_ADMIN_TOKEN`.
+- Add request logging, audit logging and backup/restore procedures.
+- Run `npm audit` and upgrade vulnerable packages before release.
 
-3. Configure environment variables in `.env` file.
+Current implementation notes:
 
-4. Start the server:
-   ```bash
-   npm run start
-   ```
+- Basic structured request logging is enabled.
+- Audit logs are emitted for order, product and category create/update/delete flows.
 
----
+## Legal and compliance scope
 
-## **API Endpoints**
+This repository now contains technical production safeguards, but a pawnshop or pawn-loan product still needs legal sign-off before release. In particular, review:
 
-### **Base URL**
-**https://api.newpawnshop.com**
+- regulated pawnshop activity registration and customer disclosures,
+- consumer withdrawal/complaint flows,
+- GDPR retention rules and data processing register,
+- AML/KYC checks if the business model includes pawn loans, redemption, high-value goods or suspicious transaction handling,
+- evidence trail for ownership verification and item provenance.
 
-### **Endpoints**
+## Planned legal work
 
-#### **Authentication**
-- **POST** `/login`
-  - **Description:** Authenticate a user and return a JWT token.
-  - **Request Body:**
-    ```json
-    {
-      "email": "user@example.com",
-      "password": "password123"
-    }
-    ```
-
-- **POST** `/register`
-  - **Description:** Register a new user.
-  - **Request Body:**
-    ```json
-    {
-      "name": "John Doe",
-      "email": "user@example.com",
-      "password": "password123"
-    }
-    ```
-
-#### **Items**
-- **GET** `/items`
-  - **Description:** Retrieve a list of all items.
-  - **Query Parameters:** Optional filters like `category`, `price_range`.
-
-- **POST** `/items`
-  - **Description:** Add a new item.
-  - **Request Body:** Requires user authentication.
-
----
-
-## **Future Enhancements**
-- Add caching mechanisms for frequently accessed endpoints.
-- Implement GraphQL for advanced querying.
-- Enable multi-language support for global accessibility.
-
----
+- Finalize business terms for pawn loans, redemption periods and sale after missed repayment.
+- Add legally reviewed templates for complaint handling, withdrawal notices and mandatory pre-contract information.
+- Define AML/KYC decision points, sanctions screening and escalation flow.
+- Define retention periods for identity data, contracts, bids, orders and security logs.

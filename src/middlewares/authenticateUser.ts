@@ -1,11 +1,13 @@
+import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { User } from "../models/userModel";
+import { env } from "../config/env";
 
-const getTokenFromRequest = (req) =>
+const getTokenFromRequest = (req: Request) =>
   req.header("Authorization")?.replace("Bearer ", "") || "";
 
 const resolveUserFromToken = async (token: string) => {
-  const serviceAdminToken = process.env.AUCTION_ADMIN_TOKEN;
+  const serviceAdminToken = env.auctionAdminToken;
 
   if (!token) return null;
 
@@ -17,14 +19,14 @@ const resolveUserFromToken = async (token: string) => {
     };
   }
 
-  const decoded = jwt.verify(token, process.env.JWT_SECRET) as { id?: string };
+  const decoded = jwt.verify(token, env.jwtSecret) as { id?: string };
   if (!decoded?.id) return null;
 
   const user = await User.findById(decoded.id);
   return user || null;
 };
 
-export const authenticateUser = async (req, res, next) => {
+export const authenticateUser = async (req: Request, res: Response, next: NextFunction) => {
   const token = getTokenFromRequest(req);
 
   if (!token) {
@@ -45,7 +47,11 @@ export const authenticateUser = async (req, res, next) => {
   }
 };
 
-export const optionallyAuthenticateUser = async (req, _res, next) => {
+export const optionallyAuthenticateUser = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+) => {
   const token = getTokenFromRequest(req);
 
   if (!token) {

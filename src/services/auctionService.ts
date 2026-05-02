@@ -1,6 +1,7 @@
 import { Auction } from "../models/auctionModel";
 import { Bid } from "../models/bidModel";
 import { AUCTION_EVENT, auctionEvents } from "./auctionEvents";
+import { logError } from "../utils/logger";
 
 const SCHEDULER_INTERVAL_MS = 5000;
 let schedulerStarted = false;
@@ -97,12 +98,16 @@ export const startAuctionScheduler = () => {
   schedulerStarted = true;
 
   processAuctionsLifecycle().catch((error) => {
-    console.error("Auction lifecycle bootstrap failed", error);
+    logError("auction_lifecycle_bootstrap_failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
   });
 
   setInterval(() => {
     processAuctionsLifecycle().catch((error) => {
-      console.error("Auction lifecycle tick failed", error);
+      logError("auction_lifecycle_tick_failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
   }, SCHEDULER_INTERVAL_MS);
 };

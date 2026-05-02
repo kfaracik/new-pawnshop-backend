@@ -38,4 +38,5 @@ export type IUser = {
   email: string;
   password: string;
   favoriteCategories: string[];
+  isAdmin: boolean;
 };

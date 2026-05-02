@@ -1,5 +1,10 @@
 import { Schema, model, models, Types } from "mongoose";
 
+export interface ICategoryProperty {
+  name: string;
+  values: string[];
+}
+
 export interface ICategory {
   _id: Types.ObjectId;
   name: string;
@@ -7,6 +12,7 @@ export interface ICategory {
   parentId: Types.ObjectId | null;
   isActive: boolean;
   sortOrder: number;
+  properties: ICategoryProperty[];
 }
 
 const categorySchema = new Schema<ICategory>(
@@ -42,6 +48,22 @@ const categorySchema = new Schema<ICategory>(
       default: 0,
       min: 0,
     },
+    properties: [
+      {
+        _id: false,
+        name: {
+          type: String,
+          required: true,
+          trim: true,
+          minlength: 1,
+          maxlength: 80,
+        },
+        values: {
+          type: [String],
+          default: [],
+        },
+      },
+    ],
   },
   {
     timestamps: true,

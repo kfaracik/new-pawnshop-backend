@@ -3,28 +3,24 @@ import mongoose, { Types } from "mongoose";
 import { Order } from "../models/orderModel";
 import { Product } from "../models/productModel";
 import { getReservationExpiresAt } from "../services/orderReservationService";
+import { logAudit } from "../utils/logger";
+import {
+  getDeliveryEtaLabel,
+  getPaymentProvider,
+  getPaymentStatusForMethod,
+  normalizeCheckoutSelection,
+} from "../utils/checkout";
+import {
+  hasInvalidOrderProducts,
+  hasMissingCustomerFields,
+  normalizeCustomer,
+  normalizeOrderProducts,
+} from "../utils/order";
 
 const TERMINAL_ORDER_STATUSES = new Set(["completed", "canceled", "failed"]);
 const STOCK_RESTORE_ORDER_STATUSES = new Set(["canceled", "failed"]);
 const PAID_PAYMENT_STATUSES = new Set(["paid"]);
 const UNPAID_PAYMENT_STATUSES = new Set(["unpaid", "failed", "canceled"]);
-
-const normalizeCustomerField = (value: unknown) => String(value || "").trim();
-
-const mergeOrderProducts = (products: any[]) => {
-  const merged = new Map<string, number>();
-
-  for (const item of products) {
-    const productId = String(item?.productId || "");
-    const quantity = Number(item?.quantity || 0);
-    merged.set(productId, Number(merged.get(productId) || 0) + quantity);
-  }
-
-  return [...merged.entries()].map(([productId, quantity]) => ({
-    productId,
-    quantity,
-  }));
-};
 
 const getAllOrders = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -73,23 +69,17 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
 
   try {
     const { name, email, city, postalCode, streetAddress, country, products } = req.body || {};
-    const normalizedCustomer = {
-      name: normalizeCustomerField(name),
-      email: normalizeCustomerField(email).toLowerCase(),
-      city: normalizeCustomerField(city),
-      postalCode: normalizeCustomerField(postalCode),
-      streetAddress: normalizeCustomerField(streetAddress),
-      country: normalizeCustomerField(country),
-    };
+    const checkoutSelection = normalizeCheckoutSelection(req.body);
+    const normalizedCustomer = normalizeCustomer({
+      name,
+      email,
+      city,
+      postalCode,
+      streetAddress,
+      country,
+    });
 
-    if (
-      !normalizedCustomer.name ||
-      !normalizedCustomer.email ||
-      !normalizedCustomer.city ||
-      !normalizedCustomer.postalCode ||
-      !normalizedCustomer.streetAddress ||
-      !normalizedCustomer.country
-    ) {
+    if (hasMissingCustomerFields(normalizedCustomer)) {
       return res.status(400).json({ message: "Missing customer details" });
     }
 
@@ -97,20 +87,13 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
       return res.status(400).json({ message: "Order must include at least one product" });
     }
 
-    const normalizedProducts = mergeOrderProducts(products).map((item: any) => ({
-      productId: String(item?.productId || ""),
-      quantity: Number(item?.quantity || 0),
-    }));
+    const normalizedProducts = normalizeOrderProducts(products);
 
-    const hasInvalidItem = normalizedProducts.some(
-      (item: any) => !Types.ObjectId.isValid(item.productId) || !Number.isFinite(item.quantity) || item.quantity < 1
-    );
-
-    if (hasInvalidItem) {
+    if (hasInvalidOrderProducts(normalizedProducts)) {
       return res.status(400).json({ message: "Invalid order products payload" });
     }
 
-    const uniqueProductIds = [...new Set(normalizedProducts.map((item: any) => item.productId))];
+    const uniqueProductIds = [...new Set(normalizedProducts.map((item) => item.productId))];
     let createdOrder: any = null;
 
     await session.withTransaction(async () => {
@@ -171,6 +154,8 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
         (sum, item) => sum + Number(item.price) * Number(item.quantity),
         0
       );
+      const grandTotal = Number((totalAmount + checkoutSelection.deliveryPrice).toFixed(2));
+      const paymentMethod = checkoutSelection.paymentMethod;
 
       const [newOrder] = await Order.create(
         [
@@ -179,8 +164,21 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
             customer: normalizedCustomer,
             products: orderProducts,
             totalAmount,
+            subtotalAmount: totalAmount,
+            deliveryPrice: checkoutSelection.deliveryPrice,
+            grandTotal,
+            deliveryMethod: checkoutSelection.deliveryMethod,
+            deliveryEtaLabel: getDeliveryEtaLabel(checkoutSelection.deliveryMethod),
+            paymentMethod,
+            paymentProvider: getPaymentProvider(paymentMethod),
+            paymentSessionStatus:
+              paymentMethod === "stripe_card" ? "sandbox_ready" : "not_started",
+            paymentNotes:
+              paymentMethod === "stripe_card"
+                ? "Stripe sandbox can be connected later without changing checkout UX."
+                : "Awaiting manual bank transfer confirmation.",
             orderStatus: "pending_payment",
-            paymentStatus: "unpaid",
+            paymentStatus: getPaymentStatusForMethod(paymentMethod),
             paid: false,
             reservationExpiresAt: getReservationExpiresAt(),
           },
@@ -189,6 +187,14 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
       );
 
       createdOrder = newOrder;
+    });
+
+    logAudit("order_created", {
+      orderId: createdOrder?._id,
+      userId: req.user?._id,
+      totalAmount: createdOrder?.grandTotal,
+      paymentMethod: createdOrder?.paymentMethod,
+      deliveryMethod: createdOrder?.deliveryMethod,
     });
 
     return res.status(201).json(createdOrder);
@@ -274,6 +280,13 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
       updatedOrder = order.toObject();
     });
 
+    logAudit("order_updated", {
+      orderId: updatedOrder?._id,
+      userId: req.user?._id,
+      orderStatus: updatedOrder?.orderStatus,
+      paymentStatus: updatedOrder?.paymentStatus,
+    });
+
     res.status(200).json(updatedOrder);
   } catch (error) {
     if ((error as Error)?.message === "ORDER_NOT_FOUND") {
@@ -295,6 +308,11 @@ const deleteOrder = async (req: Request, res: Response, next: NextFunction) => {
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
+
+    logAudit("order_deleted", {
+      orderId: id,
+      userId: req.user?._id,
+    });
 
     res.status(200).json({ message: "Order deleted successfully" });
   } catch (error) {

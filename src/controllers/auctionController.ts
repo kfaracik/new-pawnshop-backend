@@ -8,41 +8,15 @@ import {
   calculateAuctionStatus,
   manualCloseAuction,
 } from "../services/auctionService";
-
-const toObjectId = (id: string) => new Types.ObjectId(id);
-
-const validateAuctionPayload = (body: any) => {
-  const { productId, startAt, endAt, startPrice, minIncrement } = body;
-
-  if (!productId || !Types.ObjectId.isValid(productId)) {
-    return "Invalid productId";
-  }
-
-  if (!startAt || !endAt) {
-    return "startAt and endAt are required";
-  }
-
-  const start = new Date(startAt);
-  const end = new Date(endAt);
-
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return "Invalid startAt or endAt";
-  }
-
-  if (end <= start) {
-    return "endAt must be later than startAt";
-  }
-
-  if (!Number.isFinite(Number(startPrice)) || Number(startPrice) < 0) {
-    return "Invalid startPrice";
-  }
-
-  if (!Number.isFinite(Number(minIncrement)) || Number(minIncrement) <= 0) {
-    return "Invalid minIncrement";
-  }
-
-  return null;
-};
+import { getSingleValue } from "../utils/request";
+import {
+  emitAuctionBidUpdated,
+  emitAuctionStatusChanged,
+  initializeAuctionEventStream,
+  isValidObjectId,
+  toObjectId,
+  validateAuctionPayload,
+} from "../utils/auction";
 
 const getAllAuctions = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -53,7 +27,7 @@ const getAllAuctions = async (req: Request, res: Response, next: NextFunction) =
       query.status = status;
     }
 
-    if (productId && Types.ObjectId.isValid(String(productId))) {
+    if (productId && isValidObjectId(String(productId))) {
       query.productId = productId;
     }
 
@@ -71,8 +45,11 @@ const getAllAuctions = async (req: Request, res: Response, next: NextFunction) =
 
 const getAuctionById = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
-    if (!Types.ObjectId.isValid(id)) {
+    const id = getSingleValue(req.params.id);
+    if (!id) {
+      return res.status(400).json({ message: "Auction id is required" });
+    }
+    if (!isValidObjectId(id)) {
       return res.status(400).json({ message: "Invalid auction id" });
     }
 
@@ -93,8 +70,11 @@ const getAuctionById = async (req: Request, res: Response, next: NextFunction) =
 
 const getAuctionBids = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
-    if (!Types.ObjectId.isValid(id)) {
+    const id = getSingleValue(req.params.id);
+    if (!id) {
+      return res.status(400).json({ message: "Auction id is required" });
+    }
+    if (!isValidObjectId(id)) {
       return res.status(400).json({ message: "Invalid auction id" });
     }
 
@@ -116,7 +96,7 @@ const getMyAuctionParticipations = async (
 ) => {
   try {
     const userId = req.user?._id;
-    if (!userId || !Types.ObjectId.isValid(String(userId))) {
+    if (!userId || !isValidObjectId(String(userId))) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
@@ -192,7 +172,7 @@ const createAuction = async (req: Request, res: Response, next: NextFunction) =>
 
     const created = await Auction.findById(auction._id).populate("productId").lean();
 
-    auctionEvents.emit(AUCTION_EVENT.STATUS_CHANGED, {
+    emitAuctionStatusChanged({
       auctionId: String(auction._id),
       status: auction.status,
       currentPrice: auction.currentPrice,
@@ -207,9 +187,12 @@ const createAuction = async (req: Request, res: Response, next: NextFunction) =>
 
 const updateAuction = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = getSingleValue(req.params.id);
+    if (!id) {
+      return res.status(400).json({ message: "Auction id is required" });
+    }
 
-    if (!Types.ObjectId.isValid(id)) {
+    if (!isValidObjectId(id)) {
       return res.status(400).json({ message: "Invalid auction id" });
     }
 
@@ -273,7 +256,7 @@ const updateAuction = async (req: Request, res: Response, next: NextFunction) =>
 
     await auction.save();
 
-    auctionEvents.emit(AUCTION_EVENT.STATUS_CHANGED, {
+    emitAuctionStatusChanged({
       auctionId: String(auction._id),
       status: auction.status,
       currentPrice: auction.currentPrice,
@@ -288,8 +271,11 @@ const updateAuction = async (req: Request, res: Response, next: NextFunction) =>
 
 const deleteAuction = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
-    if (!Types.ObjectId.isValid(id)) {
+    const id = getSingleValue(req.params.id);
+    if (!id) {
+      return res.status(400).json({ message: "Auction id is required" });
+    }
+    if (!isValidObjectId(id)) {
       return res.status(400).json({ message: "Invalid auction id" });
     }
 
@@ -312,7 +298,10 @@ const deleteAuction = async (req: Request, res: Response, next: NextFunction) =>
 
 const placeBid = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = getSingleValue(req.params.id);
+    if (!id) {
+      return res.status(400).json({ message: "Auction id is required" });
+    }
     const { amount } = req.body;
     const userId = req.user?._id;
 
@@ -320,7 +309,7 @@ const placeBid = async (req: Request, res: Response, next: NextFunction) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    if (!Types.ObjectId.isValid(id)) {
+    if (!isValidObjectId(id)) {
       return res.status(400).json({ message: "Invalid auction id" });
     }
 
@@ -369,7 +358,7 @@ const placeBid = async (req: Request, res: Response, next: NextFunction) => {
       amount: normalizedAmount,
     });
 
-    auctionEvents.emit(AUCTION_EVENT.BID_UPDATED, {
+    emitAuctionBidUpdated({
       auctionId: id,
       currentPrice: updatedAuction.currentPrice,
       minIncrement: updatedAuction.minIncrement,
@@ -397,8 +386,11 @@ const placeBid = async (req: Request, res: Response, next: NextFunction) => {
 
 const closeAuction = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
-    if (!Types.ObjectId.isValid(id)) {
+    const id = getSingleValue(req.params.id);
+    if (!id) {
+      return res.status(400).json({ message: "Auction id is required" });
+    }
+    if (!isValidObjectId(id)) {
       return res.status(400).json({ message: "Invalid auction id" });
     }
 
@@ -416,8 +408,11 @@ const closeAuction = async (req: Request, res: Response, next: NextFunction) => 
 
 const streamAuctionEvents = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
-    if (!Types.ObjectId.isValid(id)) {
+    const id = getSingleValue(req.params.id);
+    if (!id) {
+      return res.status(400).json({ message: "Auction id is required" });
+    }
+    if (!isValidObjectId(id)) {
       return res.status(400).json({ message: "Invalid auction id" });
     }
 
@@ -426,21 +421,10 @@ const streamAuctionEvents = async (req: Request, res: Response, next: NextFuncti
       return res.status(404).json({ message: "Auction not found" });
     }
 
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-
-    const sendEvent = (eventName: string, payload: any) => {
-      res.write(`event: ${eventName}\n`);
-      res.write(`data: ${JSON.stringify(payload)}\n\n`);
-    };
-
-    sendEvent("connected", {
+    const { sendEvent } = initializeAuctionEventStream({
+      res,
       auctionId: id,
-      status: auction.status,
-      currentPrice: auction.currentPrice,
-      minIncrement: auction.minIncrement,
-      endAt: auction.endAt,
+      auction,
     });
 
     const onBidUpdated = (payload: any) => {

@@ -57,6 +57,15 @@ const ProductSchema = new Schema(
       default: 0,
       min: [0, "Stock cannot be negative"],
     },
+    availabilityMode: {
+      type: String,
+      enum: ["online_only", "single_location", "multiple_locations"],
+      default: "online_only",
+    },
+    availableLocations: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,

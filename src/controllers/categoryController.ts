@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
-import { Category } from "../models/categoryModel";
+import { Category, ICategoryProperty } from "../models/categoryModel";
 import { Types } from "mongoose";
+import { getSingleValue } from "../utils/request";
+import { logAudit } from "../utils/logger";
 
 const slugify = (value: string) =>
   value
@@ -8,6 +10,35 @@ const slugify = (value: string) =>
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+
+const normalizeCategoryProperties = (value: unknown): ICategoryProperty[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const name = typeof item.name === "string" ? item.name.trim() : "";
+      const rawValues = Array.isArray(item.values) ? item.values : [];
+      const values = rawValues
+        .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+        .filter(Boolean);
+
+      if (!name) {
+        return null;
+      }
+
+      return {
+        name,
+        values: [...new Set(values)],
+      };
+    })
+    .filter((item): item is ICategoryProperty => Boolean(item));
+};
 
 const hasParentCycle = async (
   categoryId: string,
@@ -90,8 +121,14 @@ const createCategory = async (
   next: NextFunction
 ) => {
   try {
-    const { name, slug, parentId = null, isActive = true, sortOrder = 0 } =
-      req.body;
+    const {
+      name,
+      slug,
+      parentId = null,
+      isActive = true,
+      sortOrder = 0,
+      properties,
+    } = req.body;
 
     if (!name || typeof name !== "string") {
       return res.status(400).json({ message: "Name is required" });
@@ -123,9 +160,15 @@ const createCategory = async (
       parentId,
       isActive: Boolean(isActive),
       sortOrder: Number.isFinite(Number(sortOrder)) ? Number(sortOrder) : 0,
+      properties: normalizeCategoryProperties(properties),
     });
 
     await newCategory.save();
+    logAudit("category_created", {
+      categoryId: newCategory._id,
+      userId: req.user?._id,
+      name: newCategory.name,
+    });
     res.status(201).json(newCategory);
   } catch (error) {
     next(error);
@@ -138,8 +181,11 @@ const updateCategory = async (
   next: NextFunction
 ) => {
   try {
-    const { id } = req.params;
-    const { name, slug, parentId, isActive, sortOrder } = req.body;
+    const id = getSingleValue(req.params.id);
+    if (!id) {
+      return res.status(400).json({ message: "Category id is required" });
+    }
+    const { name, slug, parentId, isActive, sortOrder, properties } = req.body;
 
     if (!Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid category id" });
@@ -200,11 +246,20 @@ const updateCategory = async (
       updateData.sortOrder = Number(sortOrder);
     }
 
+    if (properties !== undefined) {
+      updateData.properties = normalizeCategoryProperties(properties);
+    }
+
     const category = await Category.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
     });
 
+    logAudit("category_updated", {
+      categoryId: category?._id,
+      userId: req.user?._id,
+      name: category?.name,
+    });
     res.status(200).json(category);
   } catch (error) {
     next(error);
@@ -217,7 +272,10 @@ const deleteCategory = async (
   next: NextFunction
 ) => {
   try {
-    const { id } = req.params;
+    const id = getSingleValue(req.params.id);
+    if (!id) {
+      return res.status(400).json({ message: "Category id is required" });
+    }
 
     if (!Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid category id" });
@@ -236,6 +294,11 @@ const deleteCategory = async (
       return res.status(404).json({ message: "Category not found" });
     }
 
+    logAudit("category_deleted", {
+      categoryId: category._id,
+      userId: req.user?._id,
+      name: category.name,
+    });
     res.status(200).json({ message: "Category deleted successfully" });
   } catch (error) {
     next(error);
