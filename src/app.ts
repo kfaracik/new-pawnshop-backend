@@ -7,6 +7,7 @@ import authRoutes from "./routes/authRoutes";
 import { connectDB } from "./config/db";
 import { env } from "./config/env";
 import errorHandler from "./middlewares/errorHandler";
+import requireDatabase from "./middlewares/requireDatabase";
 import requestLogger from "./middlewares/requestLogger";
 import orderRoutes from "./routes/orderRoutes";
 import categoryRoutes from "./routes/categoryRoutes";
@@ -125,19 +126,19 @@ app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok", environment: env.nodeEnv });
 });
 
-app.use("/api/v1/products", productRoutes);
+app.use("/api/v1/products", requireDatabase, productRoutes);
 app.use("/api/v1/auth", authLimiter, authRoutes);
-app.use("/api/v1/categories", categoryRoutes);
-app.use("/api/v1/orders", orderRoutes);
-app.use("/api/v1/auctions", auctionRoutes);
+app.use("/api/v1/categories", requireDatabase, categoryRoutes);
+app.use("/api/v1/orders", requireDatabase, orderRoutes);
+app.use("/api/v1/auctions", requireDatabase, auctionRoutes);
 
 // Backward compatibility for existing clients.
-app.use("/api/products", productRoutes);
+app.use("/api/products", requireDatabase, productRoutes);
 app.use("/api/auth", authLimiter, authRoutes);
-app.use("/api/category", categoryRoutes);
-app.use("/api/categories", categoryRoutes);
-app.use("/api/order", orderRoutes);
-app.use("/api/auctions", auctionRoutes);
+app.use("/api/category", requireDatabase, categoryRoutes);
+app.use("/api/categories", requireDatabase, categoryRoutes);
+app.use("/api/order", requireDatabase, orderRoutes);
+app.use("/api/auctions", requireDatabase, auctionRoutes);
 
 app.use(errorHandler);
 
