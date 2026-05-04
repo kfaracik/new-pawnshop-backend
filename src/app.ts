@@ -13,11 +13,12 @@ import categoryRoutes from "./routes/categoryRoutes";
 import auctionRoutes from "./routes/auctionRoutes";
 import { startAuctionScheduler } from "./services/auctionService";
 import { startOrderReservationScheduler } from "./services/orderReservationService";
-import { logWarn } from "./utils/logger";
+import { logError, logWarn } from "./utils/logger";
 
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("../swaggerConfig");
 const app: Application = express();
+const DB_BOOTSTRAP_RETRY_MS = 30_000;
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: env.nodeEnv === "production" ? 20 : 200,
@@ -79,9 +80,37 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
 
-connectDB();
-startAuctionScheduler();
-startOrderReservationScheduler();
+let dbBootstrapInterval: NodeJS.Timeout | null = null;
+
+const bootstrapDatabaseServices = async () => {
+  try {
+    const connected = await connectDB();
+    if (!connected) {
+      logWarn("mongodb_bootstrap_unavailable_starting_without_db");
+      return false;
+    }
+
+    startAuctionScheduler();
+    startOrderReservationScheduler();
+
+    if (dbBootstrapInterval) {
+      clearInterval(dbBootstrapInterval);
+      dbBootstrapInterval = null;
+    }
+
+    return true;
+  } catch (error) {
+    logError("mongodb_bootstrap_failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+};
+
+void bootstrapDatabaseServices();
+dbBootstrapInterval = setInterval(() => {
+  void bootstrapDatabaseServices();
+}, DB_BOOTSTRAP_RETRY_MS);
 
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
