@@ -63,7 +63,12 @@ const ProductSchema = new Schema(
       default: "online_only",
     },
     availableLocations: {
-      type: [String],
+      type: [
+        {
+          type: Schema.Types.ObjectId,
+          ref: "Location",
+        },
+      ],
       default: [],
     },
   },

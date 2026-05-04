@@ -22,6 +22,20 @@ const STOCK_RESTORE_ORDER_STATUSES = new Set(["canceled", "failed"]);
 const PAID_PAYMENT_STATUSES = new Set(["paid"]);
 const UNPAID_PAYMENT_STATUSES = new Set(["unpaid", "failed", "canceled"]);
 
+const resolveProductAvailabilityQuantity = (product: any) => {
+  const fromQuantity = Number(product?.quantity);
+  if (Number.isFinite(fromQuantity)) {
+    return Math.max(0, fromQuantity);
+  }
+
+  const fromStock = Number(product?.stock);
+  if (Number.isFinite(fromStock) && fromStock > 0) {
+    return Math.max(0, fromStock);
+  }
+
+  return Infinity;
+};
+
 const getAllOrders = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orders = await Order.find()
@@ -98,7 +112,7 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
 
     await session.withTransaction(async () => {
       const dbProducts = await Product.find({ _id: { $in: uniqueProductIds } })
-        .select("_id title price quantity")
+        .select("_id title price quantity stock")
         .session(session)
         .lean<any[]>();
 
@@ -113,29 +127,31 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
           continue;
         }
 
-        const availableQuantity = Number(dbProduct.quantity);
-        if (!Number.isFinite(availableQuantity) || availableQuantity < item.quantity) {
+        const availableQuantity = resolveProductAvailabilityQuantity(dbProduct);
+        if (availableQuantity < item.quantity) {
           unavailableProducts.push(String(dbProduct._id));
           continue;
         }
 
-        const updated = await Product.findOneAndUpdate(
-          {
-            _id: new Types.ObjectId(item.productId),
-            quantity: { $gte: item.quantity },
-          },
-          {
-            $inc: { quantity: -item.quantity },
-          },
-          {
-            new: true,
-            session,
-          }
-        );
+        if (Number.isFinite(Number(dbProduct.quantity))) {
+          const updated = await Product.findOneAndUpdate(
+            {
+              _id: new Types.ObjectId(item.productId),
+              quantity: { $gte: item.quantity },
+            },
+            {
+              $inc: { quantity: -item.quantity },
+            },
+            {
+              new: true,
+              session,
+            }
+          );
 
-        if (!updated) {
-          unavailableProducts.push(String(dbProduct._id));
-          continue;
+          if (!updated) {
+            unavailableProducts.push(String(dbProduct._id));
+            continue;
+          }
         }
 
         orderProducts.push({

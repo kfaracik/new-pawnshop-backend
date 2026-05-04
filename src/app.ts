@@ -12,6 +12,7 @@ import requestLogger from "./middlewares/requestLogger";
 import orderRoutes from "./routes/orderRoutes";
 import categoryRoutes from "./routes/categoryRoutes";
 import auctionRoutes from "./routes/auctionRoutes";
+import locationRoutes from "./routes/locationRoutes";
 import { startAuctionScheduler } from "./services/auctionService";
 import { startOrderReservationScheduler } from "./services/orderReservationService";
 import { logError, logWarn } from "./utils/logger";
@@ -129,6 +130,7 @@ app.get("/health", (_req, res) => {
 app.use("/api/v1/products", requireDatabase, productRoutes);
 app.use("/api/v1/auth", authLimiter, authRoutes);
 app.use("/api/v1/categories", requireDatabase, categoryRoutes);
+app.use("/api/v1/locations", requireDatabase, locationRoutes);
 app.use("/api/v1/orders", requireDatabase, orderRoutes);
 app.use("/api/v1/auctions", requireDatabase, auctionRoutes);
 
@@ -137,6 +139,7 @@ app.use("/api/products", requireDatabase, productRoutes);
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/category", requireDatabase, categoryRoutes);
 app.use("/api/categories", requireDatabase, categoryRoutes);
+app.use("/api/locations", requireDatabase, locationRoutes);
 app.use("/api/order", requireDatabase, orderRoutes);
 app.use("/api/auctions", requireDatabase, auctionRoutes);
 

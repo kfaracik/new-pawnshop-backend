@@ -1,4 +1,5 @@
 import { Product } from "../models/productModel";
+import { Location } from "../models/locationModel";
 import { Types } from "mongoose";
 import { IUser, User } from "../models/userModel";
 import { Order } from "../models/orderModel";
@@ -16,16 +17,42 @@ const enrichProductsWithAvailability = async (products: any[]) => {
 
   if (!productIds.length) return products;
 
-  const activeReservations = await Order.find({
-    orderStatus: "pending_payment",
-    paymentStatus: "unpaid",
-    reservationExpiresAt: { $gt: now },
-    "products.productId": { $in: productIds },
-  })
-    .select("products reservationExpiresAt")
-    .lean<any[]>();
+  const locationIds = [
+    ...new Set(
+      products.flatMap((product) => {
+        const plain = product?.toObject ? product.toObject() : product;
+        if (!Array.isArray(plain?.availableLocations)) return [];
+
+        return plain.availableLocations
+          .map((locationId: unknown) => String(locationId || ""))
+          .filter((locationId: string) => Types.ObjectId.isValid(locationId));
+      })
+    ),
+  ];
+
+  const [activeReservations, locations] = await Promise.all([
+    Order.find({
+      orderStatus: "pending_payment",
+      paymentStatus: "unpaid",
+      reservationExpiresAt: { $gt: now },
+      "products.productId": { $in: productIds },
+    })
+      .select("products reservationExpiresAt")
+      .lean<any[]>(),
+    locationIds.length
+      ? Location.find({ _id: { $in: locationIds }, isActive: true })
+          .select(
+            "name city addressLine1 addressLine2 postalCode phone email description sortOrder"
+          )
+          .sort({ sortOrder: 1, name: 1 })
+          .lean<any[]>()
+      : Promise.resolve([]),
+  ]);
 
   const reservationMap = new Map<string, Date>();
+  const locationMap = new Map(
+    locations.map((location) => [String(location._id), location])
+  );
 
   for (const order of activeReservations) {
     const expiresAt = order?.reservationExpiresAt ? new Date(order.reservationExpiresAt) : null;
@@ -47,21 +74,54 @@ const enrichProductsWithAvailability = async (products: any[]) => {
     const productId = String(plain?._id || "");
     const quantity = Number(plain?.quantity);
     const hasQuantity = Number.isFinite(quantity);
+    const stock = Number(plain?.stock);
+    const hasPositiveStock = Number.isFinite(stock) && stock > 0;
     const reservationExpiresAt = reservationMap.get(productId) || null;
 
     let availabilityStatus: "available" | "reserved" | "unavailable" = "available";
+    let availableQuantity = Infinity;
 
     if (hasQuantity && quantity <= 0) {
       availabilityStatus = reservationExpiresAt ? "reserved" : "unavailable";
     }
 
+    if (hasQuantity) {
+      availableQuantity = Math.max(0, quantity);
+    } else if (hasPositiveStock) {
+      availableQuantity = Math.max(0, stock);
+    } else if (availabilityStatus !== "available") {
+      availableQuantity = 0;
+    }
+
     return {
       ...plain,
       availabilityStatus,
+      availableQuantity,
       reservationExpiresAt,
       availabilityMode: plain?.availabilityMode || "online_only",
       availableLocations: Array.isArray(plain?.availableLocations)
         ? plain.availableLocations
+            .map((locationId: unknown) => {
+              const normalizedId = String(locationId || "");
+              return locationMap.get(normalizedId)?.name || normalizedId;
+            })
+            .filter(Boolean)
+        : [],
+      availableLocationDetails: Array.isArray(plain?.availableLocations)
+        ? plain.availableLocations
+            .map((locationId: unknown) => locationMap.get(String(locationId || "")))
+            .filter(Boolean)
+            .map((location) => ({
+              _id: String(location._id),
+              name: location.name || "",
+              city: location.city || "",
+              addressLine1: location.addressLine1 || "",
+              addressLine2: location.addressLine2 || "",
+              postalCode: location.postalCode || "",
+              phone: location.phone || "",
+              email: location.email || "",
+              description: location.description || "",
+            }))
         : [],
     };
   });
