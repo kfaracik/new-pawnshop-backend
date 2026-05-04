@@ -24,8 +24,41 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const isLocalOrigin = (origin: string) => {
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+};
+
+const isAllowedRenderPreviewOrigin = (origin: string) => {
+  try {
+    const { hostname, protocol } = new URL(origin);
+    return protocol === "https:" && hostname.endsWith(".onrender.com");
+  } catch {
+    return false;
+  }
+};
+
 const corsOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-  if (!origin || env.corsOrigins.length === 0 || env.corsOrigins.includes(origin)) {
+  if (!origin) {
+    callback(null, true);
+    return;
+  }
+
+  if (env.corsOrigins.includes(origin)) {
+    callback(null, true);
+    return;
+  }
+
+  if (env.nodeEnv !== "production" && isLocalOrigin(origin)) {
+    callback(null, true);
+    return;
+  }
+
+  if (env.corsAllowRenderPreviews && isAllowedRenderPreviewOrigin(origin)) {
     callback(null, true);
     return;
   }

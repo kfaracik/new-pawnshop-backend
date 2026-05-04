@@ -25,8 +25,12 @@ PORT=3000
 MONGODB_URI=mongodb+srv://...
 JWT_SECRET=replace-with-strong-secret
 CORS_ORIGINS=https://shop.example.com,https://admin.example.com
+CORS_ALLOW_RENDER_PREVIEWS=false
 AUCTION_ADMIN_TOKEN=replace-with-strong-service-token
 ```
+
+For Render preview or dev environments, set `CORS_ALLOW_RENDER_PREVIEWS=true`.
+For production, keep it `false` and list exact frontend domains in `CORS_ORIGINS`.
 
 ## Scripts
 

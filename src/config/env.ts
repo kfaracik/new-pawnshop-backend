@@ -4,6 +4,7 @@ type AppEnv = {
   mongoUri: string;
   jwtSecret: string;
   corsOrigins: string[];
+  corsAllowRenderPreviews: boolean;
   auctionAdminToken?: string;
 };
 
@@ -12,6 +13,11 @@ const parseCorsOrigins = (value: string | undefined) =>
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
+
+const parseBoolean = (value: string | undefined, defaultValue = false) => {
+  if (value == null || value.trim() === "") return defaultValue;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+};
 
 const requireEnv = (name: string) => {
   const value = process.env[name];
@@ -27,5 +33,6 @@ export const env: AppEnv = {
   mongoUri: requireEnv("MONGODB_URI"),
   jwtSecret: requireEnv("JWT_SECRET"),
   corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
+  corsAllowRenderPreviews: parseBoolean(process.env.CORS_ALLOW_RENDER_PREVIEWS, process.env.NODE_ENV !== "production"),
   auctionAdminToken: process.env.AUCTION_ADMIN_TOKEN,
 };
