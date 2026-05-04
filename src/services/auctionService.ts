@@ -1,7 +1,8 @@
 import { Auction } from "../models/auctionModel";
 import { Bid } from "../models/bidModel";
+import { ensureDBConnection, isDatabaseReady } from "../config/db";
 import { AUCTION_EVENT, auctionEvents } from "./auctionEvents";
-import { logError } from "../utils/logger";
+import { logError, logWarn } from "../utils/logger";
 
 const SCHEDULER_INTERVAL_MS = 5000;
 let schedulerStarted = false;
@@ -59,6 +60,14 @@ export const manualCloseAuction = async (auctionId: string) => {
 };
 
 export const processAuctionsLifecycle = async () => {
+  if (!isDatabaseReady()) {
+    const connected = await ensureDBConnection();
+    if (!connected) {
+      logWarn("auction_lifecycle_skipped_db_unavailable");
+      return;
+    }
+  }
+
   const now = new Date();
 
   const liveAuctions = await Auction.updateMany(

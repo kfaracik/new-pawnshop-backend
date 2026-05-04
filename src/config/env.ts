@@ -5,6 +5,7 @@ type AppEnv = {
   jwtSecret: string;
   corsOrigins: string[];
   corsAllowRenderPreviews: boolean;
+  corsAllowLocalhost: boolean;
   auctionAdminToken?: string;
 };
 
@@ -34,5 +35,6 @@ export const env: AppEnv = {
   jwtSecret: requireEnv("JWT_SECRET"),
   corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
   corsAllowRenderPreviews: parseBoolean(process.env.CORS_ALLOW_RENDER_PREVIEWS, process.env.NODE_ENV !== "production"),
+  corsAllowLocalhost: parseBoolean(process.env.CORS_ALLOW_LOCALHOST, true),
   auctionAdminToken: process.env.AUCTION_ADMIN_TOKEN,
 };

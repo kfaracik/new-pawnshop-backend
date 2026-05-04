@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { ensureDBConnection, isDatabaseReady } from "../config/db";
 import { Order } from "../models/orderModel";
 import { Product } from "../models/productModel";
 
@@ -9,6 +10,13 @@ export const getReservationExpiresAt = () =>
   new Date(Date.now() + RESERVATION_WINDOW_MS);
 
 export const releaseExpiredReservations = async () => {
+  if (!isDatabaseReady()) {
+    const connected = await ensureDBConnection();
+    if (!connected) {
+      return;
+    }
+  }
+
   const now = new Date();
 
   const expiredOrders = await Order.find({

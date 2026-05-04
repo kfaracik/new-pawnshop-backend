@@ -13,6 +13,7 @@ import categoryRoutes from "./routes/categoryRoutes";
 import auctionRoutes from "./routes/auctionRoutes";
 import { startAuctionScheduler } from "./services/auctionService";
 import { startOrderReservationScheduler } from "./services/orderReservationService";
+import { logWarn } from "./utils/logger";
 
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("../swaggerConfig");
@@ -53,7 +54,7 @@ const corsOrigin = (origin: string | undefined, callback: (err: Error | null, al
     return;
   }
 
-  if (env.nodeEnv !== "production" && isLocalOrigin(origin)) {
+  if (env.corsAllowLocalhost && isLocalOrigin(origin)) {
     callback(null, true);
     return;
   }
@@ -63,7 +64,8 @@ const corsOrigin = (origin: string | undefined, callback: (err: Error | null, al
     return;
   }
 
-  callback(new Error("Origin not allowed by CORS"));
+  logWarn("cors_origin_rejected", { origin });
+  callback(null, false);
 };
 
 app.disable("x-powered-by");

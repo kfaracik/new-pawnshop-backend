@@ -1,15 +1,37 @@
 import mongoose from "mongoose";
 import { env } from "./env";
-import { logError, logInfo } from "../utils/logger";
+import { logError, logInfo, logWarn } from "../utils/logger";
+
+let isConnecting = false;
+
+export const isDatabaseReady = () => mongoose.connection.readyState === 1;
 
 export const connectDB = async () => {
+  if (isDatabaseReady() || isConnecting) {
+    return isDatabaseReady();
+  }
+
+  isConnecting = true;
+
   try {
     const conn = await mongoose.connect(env.mongoUri);
     logInfo("mongodb_connected", { host: conn.connection.host });
+    return true;
   } catch (error) {
     logError("mongodb_connection_failed", {
       error: error instanceof Error ? error.message : String(error),
     });
-    process.exit(1);
+    return false;
+  } finally {
+    isConnecting = false;
   }
+};
+
+export const ensureDBConnection = async () => {
+  if (isDatabaseReady()) {
+    return true;
+  }
+
+  logWarn("mongodb_not_ready_retrying_connection");
+  return connectDB();
 };
