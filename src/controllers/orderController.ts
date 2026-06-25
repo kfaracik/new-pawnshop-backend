@@ -8,6 +8,7 @@ import {
   getDeliveryEtaLabel,
   getPaymentProvider,
   getPaymentStatusForMethod,
+  isActiveReservationPaymentStatus,
   normalizeCheckoutSelection,
 } from "../utils/checkout";
 import {
@@ -21,6 +22,40 @@ const TERMINAL_ORDER_STATUSES = new Set(["completed", "canceled", "failed"]);
 const STOCK_RESTORE_ORDER_STATUSES = new Set(["canceled", "failed"]);
 const PAID_PAYMENT_STATUSES = new Set(["paid"]);
 const UNPAID_PAYMENT_STATUSES = new Set(["unpaid", "failed", "canceled"]);
+
+const isActiveReservedOrder = (order: any) =>
+  order?.orderStatus === "pending_payment" &&
+  isActiveReservationPaymentStatus(order?.paymentStatus) &&
+  Boolean(order?.reservationExpiresAt);
+
+const resolveReservationStockField = (product: any) => {
+  if (Number.isFinite(Number(product?.quantity))) {
+    return "quantity";
+  }
+
+  if (Number.isFinite(Number(product?.stock))) {
+    return "stock";
+  }
+
+  return "none";
+};
+
+const restoreOrderStock = async (order: any, session?: mongoose.ClientSession) => {
+  for (const product of order?.products || []) {
+    const stockField = product.reservationStockField || "quantity";
+    if (stockField === "none") {
+      continue;
+    }
+
+    await Product.findByIdAndUpdate(
+      product.productId,
+      {
+        $inc: { [stockField]: Number(product.quantity || 0) },
+      },
+      session ? { session } : undefined
+    );
+  }
+};
 
 const resolveProductAvailabilityQuantity = (product: any) => {
   const fromQuantity = Number(product?.quantity);
@@ -117,7 +152,13 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
         .lean<any[]>();
 
       const productsById = new Map(dbProducts.map((p) => [String(p._id), p]));
-      const orderProducts: Array<{ productId: any; name: string; price: number; quantity: number }> = [];
+      const orderProducts: Array<{
+        productId: any;
+        name: string;
+        price: number;
+        quantity: number;
+        reservationStockField: string;
+      }> = [];
 
       for (const item of normalizedProducts) {
         const dbProduct = productsById.get(item.productId);
@@ -133,14 +174,15 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
           continue;
         }
 
-        if (Number.isFinite(Number(dbProduct.quantity))) {
+        const reservationStockField = resolveReservationStockField(dbProduct);
+        if (reservationStockField !== "none") {
           const updated = await Product.findOneAndUpdate(
             {
               _id: new Types.ObjectId(item.productId),
-              quantity: { $gte: item.quantity },
+              [reservationStockField]: { $gte: item.quantity },
             },
             {
-              $inc: { quantity: -item.quantity },
+              $inc: { [reservationStockField]: -item.quantity },
             },
             {
               new: true,
@@ -159,6 +201,7 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
           name: dbProduct.title,
           price: Number(dbProduct.price),
           quantity: item.quantity,
+          reservationStockField,
         });
       }
 
@@ -245,9 +288,7 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
       }
 
       const previousOrderStatus = order.orderStatus;
-      const previousPaymentStatus = order.paymentStatus;
-      const wasPendingReservation =
-        previousOrderStatus === "pending_payment" && previousPaymentStatus === "unpaid";
+      const wasActiveReservation = isActiveReservedOrder(order);
 
       if (orderStatus) {
         order.orderStatus = orderStatus;
@@ -255,6 +296,14 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
 
       if (paymentStatus) {
         order.paymentStatus = paymentStatus;
+      }
+
+      if (order.orderStatus === "pending_payment") {
+        if (order.paymentStatus === "failed") {
+          order.orderStatus = "failed";
+        } else if (order.paymentStatus === "canceled") {
+          order.orderStatus = "canceled";
+        }
       }
 
       if (typeof paid === "boolean") {
@@ -276,20 +325,12 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
       }
 
       const shouldRestoreStock =
-        wasPendingReservation &&
+        wasActiveReservation &&
         STOCK_RESTORE_ORDER_STATUSES.has(order.orderStatus) &&
         !STOCK_RESTORE_ORDER_STATUSES.has(previousOrderStatus);
 
       if (shouldRestoreStock) {
-        for (const product of order.products || []) {
-          await Product.findByIdAndUpdate(
-            product.productId,
-            {
-              $inc: { quantity: Number(product.quantity || 0) },
-            },
-            { session }
-          );
-        }
+        await restoreOrderStock(order, session);
       }
 
       await order.save({ session });
@@ -316,12 +357,28 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
 };
 
 const deleteOrder = async (req: Request, res: Response, next: NextFunction) => {
+  const session = await mongoose.startSession();
+
   try {
     const { id } = req.params;
+    let deletedOrder: any = null;
 
-    const order = await Order.findByIdAndDelete(id);
+    await session.withTransaction(async () => {
+      const order = await Order.findById(id).session(session);
 
-    if (!order) {
+      if (!order) {
+        throw new Error("ORDER_NOT_FOUND");
+      }
+
+      if (isActiveReservedOrder(order)) {
+        await restoreOrderStock(order, session);
+      }
+
+      deletedOrder = order.toObject();
+      await order.deleteOne({ session });
+    });
+
+    if (!deletedOrder) {
       return res.status(404).json({ message: "Order not found" });
     }
 
@@ -332,7 +389,13 @@ const deleteOrder = async (req: Request, res: Response, next: NextFunction) => {
 
     res.status(200).json({ message: "Order deleted successfully" });
   } catch (error) {
+    if ((error as Error)?.message === "ORDER_NOT_FOUND") {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
     next(error);
+  } finally {
+    await session.endSession();
   }
 };
 

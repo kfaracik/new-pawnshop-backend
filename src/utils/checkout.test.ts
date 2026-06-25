@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getDeliveryEtaLabel,
   getDeliveryPrice,
+  isActiveReservationPaymentStatus,
   getPaymentProvider,
   getPaymentStatusForMethod,
   normalizeCheckoutSelection,
@@ -35,5 +36,12 @@ describe("checkout utils", () => {
     expect(getDeliveryPrice("courier_standard")).toBe(16.9);
     expect(getPaymentStatusForMethod("bank_transfer")).toBe("pending");
     expect(getPaymentProvider("stripe_card")).toBe("stripe");
+  });
+
+  it("treats unpaid and pending payments as active reservations", () => {
+    expect(isActiveReservationPaymentStatus("unpaid")).toBe(true);
+    expect(isActiveReservationPaymentStatus("pending")).toBe(true);
+    expect(isActiveReservationPaymentStatus("paid")).toBe(false);
+    expect(isActiveReservationPaymentStatus("failed")).toBe(false);
   });
 });

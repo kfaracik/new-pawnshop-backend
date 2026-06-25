@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { ensureDBConnection, isDatabaseReady } from "../config/db";
 import { Order } from "../models/orderModel";
 import { Product } from "../models/productModel";
+import { isActiveReservationPaymentStatus } from "../utils/checkout";
 
 const RESERVATION_WINDOW_MS = 48 * 60 * 60 * 1000;
 const SCHEDULER_INTERVAL_MS = 60 * 1000;
@@ -21,7 +22,7 @@ export const releaseExpiredReservations = async () => {
 
   const expiredOrders = await Order.find({
     orderStatus: "pending_payment",
-    paymentStatus: "unpaid",
+    paymentStatus: { $in: ["unpaid", "pending"] },
     reservationExpiresAt: { $lte: now },
   })
     .select("_id products")
@@ -37,7 +38,7 @@ export const releaseExpiredReservations = async () => {
         if (
           !freshOrder ||
           freshOrder.orderStatus !== "pending_payment" ||
-          freshOrder.paymentStatus !== "unpaid" ||
+          !isActiveReservationPaymentStatus(freshOrder.paymentStatus) ||
           !freshOrder.reservationExpiresAt ||
           freshOrder.reservationExpiresAt > now
         ) {
@@ -45,10 +46,15 @@ export const releaseExpiredReservations = async () => {
         }
 
         for (const product of freshOrder.products || []) {
+          const stockField = product.reservationStockField || "quantity";
+          if (stockField === "none") {
+            continue;
+          }
+
           await Product.findByIdAndUpdate(
             product.productId,
             {
-              $inc: { quantity: Number(product.quantity || 0) },
+              $inc: { [stockField]: Number(product.quantity || 0) },
             },
             { session }
           );
@@ -57,6 +63,7 @@ export const releaseExpiredReservations = async () => {
         freshOrder.orderStatus = "failed";
         freshOrder.paymentStatus = "failed";
         freshOrder.paid = false;
+        freshOrder.reservationExpiresAt = null;
         await freshOrder.save({ session });
       });
     } catch (_error) {

@@ -70,6 +70,9 @@ export const getPaymentStatusForMethod = (paymentMethod: string) => {
   return "unpaid";
 };
 
+export const isActiveReservationPaymentStatus = (paymentStatus: string) =>
+  paymentStatus === "unpaid" || paymentStatus === "pending";
+
 export const getPaymentProvider = (paymentMethod: string) => {
   if (paymentMethod === "stripe_card") {
     return "stripe";
