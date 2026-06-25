@@ -33,9 +33,9 @@ const router = Router();
  *                 email:
  *                   type: string
  *                   description: User's email address
- *                 name:
- *                   type: string
- *                   description: User's name
+ *                 isAdmin:
+ *                   type: boolean
+ *                   description: Whether user has admin privileges
  *       401:
  *         description: Unauthorized, token missing or invalid
  *       404:
@@ -79,7 +79,13 @@ const router = Router();
  *                   example: User registered successfully
  *                 token:
  *                   type: string
- *                   description: JWT token for authentication
+ *                   description: JWT access token for Authorization Bearer header
+ *                 tokenType:
+ *                   type: string
+ *                   example: Bearer
+ *                 expiresIn:
+ *                   type: number
+ *                   description: Access token lifetime in seconds
  *       400:
  *         description: Email is already in use
  *       500:
@@ -121,16 +127,38 @@ const router = Router();
  *                   example: Login successful
  *                 token:
  *                   type: string
- *                   description: JWT token for authentication
+ *                   description: JWT access token for Authorization Bearer header
+ *                 tokenType:
+ *                   type: string
+ *                   example: Bearer
+ *                 expiresIn:
+ *                   type: number
+ *                   description: Access token lifetime in seconds
  *       401:
  *         description: Invalid credentials
  *       500:
  *         description: Internal server error
  */
 
+/**
+ * @swagger
+ * /logout:
+ *   post:
+ *     summary: Logout current user
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logout accepted; client should remove JWT
+ *       401:
+ *         description: Unauthorized, token missing or invalid
+ */
+
 
 router.get("/user", authenticateUser, authController.getUserData);
 router.post("/register", authController.register);
 router.post("/login", authController.login);
+router.post("/logout", authenticateUser, authController.logout);
 
 export default router;

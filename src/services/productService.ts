@@ -6,6 +6,7 @@ import { Order } from "../models/orderModel";
 import { sanitizeHtml } from "../utils/html";
 import { buildSearchRegex } from "../utils/search";
 import { logError } from "../utils/logger";
+import { isActiveReservationPaymentStatus } from "../utils/checkout";
 
 const enrichProductsWithAvailability = async (products: any[]) => {
   if (!Array.isArray(products) || products.length === 0) return [];
@@ -33,11 +34,11 @@ const enrichProductsWithAvailability = async (products: any[]) => {
   const [activeReservations, locations] = await Promise.all([
     Order.find({
       orderStatus: "pending_payment",
-      paymentStatus: "unpaid",
+      paymentStatus: { $in: ["unpaid", "pending"] },
       reservationExpiresAt: { $gt: now },
       "products.productId": { $in: productIds },
     })
-      .select("products reservationExpiresAt")
+      .select("products paymentStatus reservationExpiresAt")
       .lean<any[]>(),
     locationIds.length
       ? Location.find({ _id: { $in: locationIds }, isActive: true })
@@ -57,6 +58,7 @@ const enrichProductsWithAvailability = async (products: any[]) => {
   for (const order of activeReservations) {
     const expiresAt = order?.reservationExpiresAt ? new Date(order.reservationExpiresAt) : null;
     if (!expiresAt || Number.isNaN(expiresAt.getTime())) continue;
+    if (!isActiveReservationPaymentStatus(order?.paymentStatus)) continue;
 
     for (const orderedProduct of order.products || []) {
       const productId = String(orderedProduct?.productId || "");
