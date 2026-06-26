@@ -1,4 +1,4 @@
-import { model, models, Schema } from "mongoose";
+import { Model, model, models, Schema } from "mongoose";
 
 const LocationSchema = new Schema(
   {
@@ -56,4 +56,4 @@ const LocationSchema = new Schema(
   }
 );
 
-export const Location = models.Location || model("Location", LocationSchema);
+export const Location: Model<any> = models.Location || model("Location", LocationSchema);

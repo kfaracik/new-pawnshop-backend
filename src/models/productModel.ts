@@ -1,4 +1,4 @@
-import mongoose, { model, Schema, models } from "mongoose";
+import mongoose, { Model, model, Schema, models } from "mongoose";
 
 const ProductSchema = new Schema(
   {
@@ -77,4 +77,4 @@ const ProductSchema = new Schema(
   }
 );
 
-export const Product = models.Product || model("Product", ProductSchema);
+export const Product: Model<any> = models.Product || model("Product", ProductSchema);

@@ -306,19 +306,19 @@ const router = Router();
  *         description: The product ID
  *         required: true
  *         schema:
- *           type: integer
- *       - name: product
- *         in: body
- *         description: The product data to update
- *         required: true
- *         schema:
- *           type: object
- *           properties:
- *             name:
- *               type: string
- *             price:
- *               type: number
- *               format: float
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               price:
+ *                 type: number
+ *                 format: float
  *     responses:
  *       200:
  *         description: The updated product

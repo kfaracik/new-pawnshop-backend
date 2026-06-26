@@ -1,4 +1,4 @@
-import { Schema, model, models, Types } from "mongoose";
+import { Model, Schema, model, models, Types } from "mongoose";
 
 export interface ICategoryProperty {
   name: string;
@@ -74,4 +74,5 @@ const categorySchema = new Schema<ICategory>(
 categorySchema.index({ slug: 1 }, { unique: true });
 categorySchema.index({ parentId: 1, sortOrder: 1, name: 1 });
 
-export const Category = models.Category || model<ICategory>("Category", categorySchema);
+export const Category: Model<ICategory> =
+  models.Category || model<ICategory>("Category", categorySchema);

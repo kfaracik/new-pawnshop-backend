@@ -27,6 +27,12 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: env.nodeEnv === "production" ? 300 : 2_000,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const isLocalOrigin = (origin: string) => {
   try {
@@ -78,9 +84,15 @@ app.use(
     crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "100kb" }));
+app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 app.use(requestLogger);
+app.use(
+  cors({
+    origin: corsOrigin,
+    credentials: true,
+  })
+);
 
 let dbBootstrapInterval: NodeJS.Timeout | null = null;
 
@@ -114,18 +126,29 @@ dbBootstrapInterval = setInterval(() => {
   void bootstrapDatabaseServices();
 }, DB_BOOTSTRAP_RETRY_MS);
 
-app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
-app.use(
-  cors({
-    origin: corsOrigin,
-    credentials: true,
-  })
-);
+if (env.enableApiDocs) {
+  app.get("/openapi.json", (_req, res) => {
+    res
+      .setHeader("Cache-Control", "no-store")
+      .status(200)
+      .json(swaggerSpec);
+  });
+  app.use(
+    "/docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
+      swaggerOptions: {
+        persistAuthorization: true,
+      },
+    })
+  );
+}
 
 app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok", environment: env.nodeEnv });
 });
+
+app.use("/api", apiLimiter);
 
 app.use("/api/v1/products", requireDatabase, productRoutes);
 app.use("/api/v1/auth", authLimiter, authRoutes);
