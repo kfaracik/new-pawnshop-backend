@@ -1,4 +1,4 @@
-import { Schema, model, models } from "mongoose";
+import { Model, Schema, model, models } from "mongoose";
 
 const AuctionSchema = new Schema(
   {
@@ -28,4 +28,4 @@ const AuctionSchema = new Schema(
 AuctionSchema.index({ status: 1, startAt: 1, endAt: 1 });
 AuctionSchema.index({ endAt: 1 });
 
-export const Auction = models.Auction || model("Auction", AuctionSchema);
+export const Auction: Model<any> = models.Auction || model("Auction", AuctionSchema);

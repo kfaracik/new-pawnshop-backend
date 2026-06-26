@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from "express";
+import { Types } from "mongoose";
 import ProductService from "../services/productService";
-import { getSingleValue } from "../utils/request";
+import { getSingleValue, parsePagination, parsePositiveInteger } from "../utils/request";
 import { logAudit, logError } from "../utils/logger";
+import { normalizeProductInput, validateProductInput } from "../utils/product";
 
 const getAllProducts = async (
   req: Request,
@@ -9,10 +11,8 @@ const getAllProducts = async (
   next: NextFunction
 ) => {
   try {
-    const page = parseInt(req.query.page as string, 10) || 1;
-    const limit = parseInt(req.query.limit as string, 10) || 10;
+    const { page, limit, skip } = parsePagination(req.query);
     const category = (req.query.category as string) || "";
-    const skip = (page - 1) * limit;
 
     const [products, total] = await Promise.all([
       ProductService.getProducts(skip, limit, category),
@@ -35,6 +35,9 @@ const getProduct = async (req: Request, res: Response, next: NextFunction) => {
     const id = getSingleValue(req.params.id);
     if (!id) {
       return res.status(400).json({ error: "Product id is required" });
+    }
+    if (!Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid product id" });
     }
     const product = await ProductService.getProduct(id);
 
@@ -59,14 +62,14 @@ const searchProducts = async (
 ) => {
   try {
     const query = (req.query.query as string) || "";
-    const page = parseInt(req.query.page as string, 10) || 1;
-    const limit = parseInt(req.query.limit as string, 10) || 10;
-    const skip = (page - 1) * limit;
+    const category = (req.query.category as string) || "";
+    const { page, limit, skip } = parsePagination(req.query);
 
     const { products, totalProducts } = await ProductService.searchProducts(
       query,
       skip,
-      limit
+      limit,
+      category
     );
 
     res.status(200).json({
@@ -120,7 +123,7 @@ const getPopularProducts = async (
   next: NextFunction
 ) => {
   try {
-    const limit = parseInt(req.query.limit as string, 10) || 10;
+    const limit = parsePositiveInteger(req.query.limit, 10, 24);
     const popularProducts = await ProductService.getPopularProducts(limit);
 
     res.status(200).json(popularProducts);
@@ -135,7 +138,16 @@ const createProduct = async (
   next: NextFunction
 ) => {
   try {
-    const newProduct = await ProductService.createProduct(req.body);
+    const productInput = normalizeProductInput(req.body);
+    const validationError = validateProductInput(productInput, {
+      requireRequiredFields: true,
+    });
+
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+
+    const newProduct = await ProductService.createProduct(productInput);
     logAudit("product_created", {
       productId: newProduct?._id,
       userId: req.user?._id,
@@ -157,9 +169,19 @@ const updateProduct = async (
     if (!id) {
       return res.status(400).json({ message: "Product id is required" });
     }
+    if (!Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid product id" });
+    }
+    const productInput = normalizeProductInput(req.body);
+    const validationError = validateProductInput(productInput);
+
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+
     const updatedProduct = await ProductService.updateProduct(
       id,
-      req.body
+      productInput
     );
     if (!updatedProduct) {
       return res.status(404).json({ message: "Product not found" });
@@ -184,6 +206,9 @@ const deleteProduct = async (
     const id = getSingleValue(req.params.id);
     if (!id) {
       return res.status(400).json({ message: "Product id is required" });
+    }
+    if (!Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid product id" });
     }
 
     const deletedProduct = await ProductService.deleteProduct(id);

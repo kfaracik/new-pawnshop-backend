@@ -85,16 +85,16 @@ const router = Router();
  *         description: The category ID
  *         required: true
  *         schema:
- *           type: integer
- *       - name: category
- *         in: body
- *         description: The category data to update
- *         required: true
- *         schema:
- *           type: object
- *           properties:
- *             name:
- *               type: string
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
  *     responses:
  *       200:
  *         description: The updated category

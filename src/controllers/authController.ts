@@ -1,110 +1,122 @@
 import type { NextFunction, Request, Response } from "express";
-import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { User } from "../models/userModel";
-import { env } from "../config/env";
-import { logError } from "../utils/logger";
+import {
+  createAccessToken,
+  getAccessTokenExpiresInSeconds,
+  isValidEmail,
+  normalizeEmail,
+  validatePassword,
+} from "../utils/auth";
 
-type JwtPayload = {
-  id?: string;
-};
-
-const createToken = (userId: string) =>
-  jwt.sign({ id: userId }, env.jwtSecret, {
-    expiresIn: "7d",
-  });
+const AUTH_FAILED_MESSAGE = "Nieprawidłowy e-mail lub hasło.";
 
 export const getUserData = async (req: Request, res: Response) => {
-  try {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
+  const user = req.user;
 
-    if (!token) {
-      return res.status(401).json({ message: "No token provided" });
-    }
-
-    const decoded = jwt.verify(token, env.jwtSecret) as JwtPayload;
-
-    const user = await User.findById(decoded.id);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.json({
-      id: user._id,
-      email: user.email,
-      name: user.name,
-    });
-  } catch (err) {
-    logError("auth_me_failed", {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    res.status(500).json({ message: "Server error" });
+  if (!user?._id) {
+    return res.status(401).json({ message: "Nie jesteś zalogowany." });
   }
+
+  return res.json({
+    id: user._id,
+    email: user.email,
+    isAdmin: Boolean(user.isAdmin),
+  });
 };
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = req.body;
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || "");
 
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: "Podaj prawidłowy adres e-mail." });
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return res.status(400).json({ message: passwordError });
     }
 
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
-      return res.status(400).json({ message: "Email is already in use" });
+      return res.status(409).json({ message: "Konto z tym adresem e-mail już istnieje." });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
     const user = new User({ email, password: hashedPassword });
     await user.save();
 
-    const token = createToken(String(user._id));
+    const token = createAccessToken(user);
 
     res.status(201).json({
-      message: "User registered successfully",
+      message: "Konto zostało utworzone.",
       token,
+      tokenType: "Bearer",
+      expiresIn: getAccessTokenExpiresInSeconds(),
+      user: {
+        id: user._id,
+        email: user.email,
+        isAdmin: Boolean(user.isAdmin),
+      },
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ message: "Konto z tym adresem e-mail już istnieje." });
+    }
+
     next(error);
   }
 };
 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = req.body;
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || "");
 
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+    if (!isValidEmail(email) || !password) {
+      return res.status(401).json({ message: AUTH_FAILED_MESSAGE });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select("+password email isAdmin");
 
     if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({ message: AUTH_FAILED_MESSAGE });
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({ message: AUTH_FAILED_MESSAGE });
     }
 
-    const token = createToken(String(user._id));
+    const token = createAccessToken(user);
 
     res.status(200).json({
-      message: "Login successful",
+      message: "Zalogowano pomyślnie.",
       token,
+      tokenType: "Bearer",
+      expiresIn: getAccessTokenExpiresInSeconds(),
+      user: {
+        id: user._id,
+        email: user.email,
+        isAdmin: Boolean(user.isAdmin),
+      },
     });
   } catch (error) {
     next(error);
   }
 };
 
+export const logout = async (_req: Request, res: Response) => {
+  return res.status(200).json({ message: "Wylogowano pomyślnie." });
+};
+
 export default {
   getUserData,
   register,
   login,
+  logout,
 };

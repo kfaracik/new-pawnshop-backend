@@ -1,10 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
-import jwt from "jsonwebtoken";
 import { User } from "../models/userModel";
 import { env } from "../config/env";
+import { verifyAccessToken } from "../utils/auth";
 
 const getTokenFromRequest = (req: Request) =>
-  req.header("Authorization")?.replace("Bearer ", "") || "";
+  req.header("Authorization")?.match(/^Bearer\s+(.+)$/i)?.[1] || "";
 
 const resolveUserFromToken = async (token: string) => {
   const serviceAdminToken = env.auctionAdminToken;
@@ -19,10 +19,11 @@ const resolveUserFromToken = async (token: string) => {
     };
   }
 
-  const decoded = jwt.verify(token, env.jwtSecret) as { id?: string };
-  if (!decoded?.id) return null;
+  const decoded = verifyAccessToken(token);
+  const userId = decoded.sub || decoded.id;
+  if (!userId || decoded.type !== "access") return null;
 
-  const user = await User.findById(decoded.id);
+  const user = await User.findById(userId).select("_id email isAdmin");
   return user || null;
 };
 
@@ -30,7 +31,7 @@ export const authenticateUser = async (req: Request, res: Response, next: NextFu
   const token = getTokenFromRequest(req);
 
   if (!token) {
-    return res.status(401).json({ message: "No token provided" });
+    return res.status(401).json({ message: "Nie jesteś zalogowany." });
   }
 
   try {
@@ -43,7 +44,7 @@ export const authenticateUser = async (req: Request, res: Response, next: NextFu
     req.user = user;
     next();
   } catch (error) {
-    return res.status(401).json({ message: "Invalid or expired token" });
+    return res.status(401).json({ message: "Sesja wygasła. Zaloguj się ponownie." });
   }
 };
 

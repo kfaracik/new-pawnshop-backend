@@ -17,11 +17,27 @@ import {
   normalizeCustomer,
   normalizeOrderProducts,
 } from "../utils/order";
+import { getSingleValue } from "../utils/request";
 
 const TERMINAL_ORDER_STATUSES = new Set(["completed", "canceled", "failed"]);
 const STOCK_RESTORE_ORDER_STATUSES = new Set(["canceled", "failed"]);
 const PAID_PAYMENT_STATUSES = new Set(["paid"]);
 const UNPAID_PAYMENT_STATUSES = new Set(["unpaid", "failed", "canceled"]);
+const ORDER_STATUSES = new Set([
+  "pending_payment",
+  "paid",
+  "completed",
+  "canceled",
+  "failed",
+]);
+const PAYMENT_STATUSES = new Set([
+  "unpaid",
+  "pending",
+  "paid",
+  "failed",
+  "canceled",
+  "refunded",
+]);
 
 const isActiveReservedOrder = (order: any) =>
   order?.orderStatus === "pending_payment" &&
@@ -276,9 +292,25 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
   const session = await mongoose.startSession();
 
   try {
-    const { id } = req.params;
+    const id = getSingleValue(req.params.id);
     const { orderStatus, paymentStatus, paid } = req.body || {};
     let updatedOrder: any = null;
+
+    if (!id) {
+      return res.status(400).json({ message: "Order id is required" });
+    }
+
+    if (!Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid order id" });
+    }
+
+    if (orderStatus !== undefined && !ORDER_STATUSES.has(orderStatus)) {
+      return res.status(400).json({ message: "Invalid order status" });
+    }
+
+    if (paymentStatus !== undefined && !PAYMENT_STATUSES.has(paymentStatus)) {
+      return res.status(400).json({ message: "Invalid payment status" });
+    }
 
     await session.withTransaction(async () => {
       const order = await Order.findById(id).session(session);
@@ -360,8 +392,16 @@ const deleteOrder = async (req: Request, res: Response, next: NextFunction) => {
   const session = await mongoose.startSession();
 
   try {
-    const { id } = req.params;
+    const id = getSingleValue(req.params.id);
     let deletedOrder: any = null;
+
+    if (!id) {
+      return res.status(400).json({ message: "Order id is required" });
+    }
+
+    if (!Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid order id" });
+    }
 
     await session.withTransaction(async () => {
       const order = await Order.findById(id).session(session);

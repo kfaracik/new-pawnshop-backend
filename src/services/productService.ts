@@ -6,6 +6,8 @@ import { Order } from "../models/orderModel";
 import { sanitizeHtml } from "../utils/html";
 import { buildSearchRegex } from "../utils/search";
 import { logError } from "../utils/logger";
+import { isActiveReservationPaymentStatus } from "../utils/checkout";
+import type { ProductInput } from "../utils/product";
 
 const enrichProductsWithAvailability = async (products: any[]) => {
   if (!Array.isArray(products) || products.length === 0) return [];
@@ -33,11 +35,11 @@ const enrichProductsWithAvailability = async (products: any[]) => {
   const [activeReservations, locations] = await Promise.all([
     Order.find({
       orderStatus: "pending_payment",
-      paymentStatus: "unpaid",
+      paymentStatus: { $in: ["unpaid", "pending"] },
       reservationExpiresAt: { $gt: now },
       "products.productId": { $in: productIds },
     })
-      .select("products reservationExpiresAt")
+      .select("products paymentStatus reservationExpiresAt")
       .lean<any[]>(),
     locationIds.length
       ? Location.find({ _id: { $in: locationIds }, isActive: true })
@@ -57,6 +59,7 @@ const enrichProductsWithAvailability = async (products: any[]) => {
   for (const order of activeReservations) {
     const expiresAt = order?.reservationExpiresAt ? new Date(order.reservationExpiresAt) : null;
     if (!expiresAt || Number.isNaN(expiresAt.getTime())) continue;
+    if (!isActiveReservationPaymentStatus(order?.paymentStatus)) continue;
 
     for (const orderedProduct of order.products || []) {
       const productId = String(orderedProduct?.productId || "");
@@ -167,9 +170,14 @@ const getNewProducts = async () => {
   return enrichProductsWithAvailability(products as any[]);
 };
 
-const searchProducts = async (query: string, skip: number, limit: number) => {
+const searchProducts = async (
+  query: string,
+  skip: number,
+  limit: number,
+  category?: string
+) => {
   const safeRegex = buildSearchRegex(query);
-  const filter = safeRegex
+  const filter: any = safeRegex
     ? {
         $or: [
           { title: safeRegex },
@@ -177,6 +185,10 @@ const searchProducts = async (query: string, skip: number, limit: number) => {
         ],
       }
     : {};
+
+  if (category && Types.ObjectId.isValid(category)) {
+    filter.category = new Types.ObjectId(category);
+  }
 
   const productsPromise = Product.find(filter)
     .skip(skip)
@@ -195,19 +207,7 @@ const searchProducts = async (query: string, skip: number, limit: number) => {
   return { products: enrichedProducts, totalProducts };
 };
 
-const createProduct = async (productData: {
-  title: string;
-  description?: string;
-  price: number;
-  images: string[];
-  category: string;
-  stock: number;
-  quantity?: number;
-  isAuction?: boolean;
-  auctionLink?: string | null;
-  availabilityMode?: string;
-  availableLocations?: string[];
-}) => {
+const createProduct = async (productData: ProductInput) => {
   const product = new Product({
     ...productData,
     description: sanitizeHtml(productData.description),
@@ -215,22 +215,7 @@ const createProduct = async (productData: {
   return await product.save();
 };
 
-const updateProduct = async (
-  productId: string,
-  productData: {
-    title?: string;
-    description?: string;
-    price?: number;
-    images?: string[];
-    category?: string;
-    stock?: number;
-    quantity?: number;
-    isAuction?: boolean;
-    auctionLink?: string | null;
-    availabilityMode?: string;
-    availableLocations?: string[];
-  }
-) => {
+const updateProduct = async (productId: string, productData: ProductInput) => {
   const normalizedProductData = {
     ...productData,
     ...(productData.description !== undefined
@@ -240,6 +225,7 @@ const updateProduct = async (
 
   return await Product.findByIdAndUpdate(productId, normalizedProductData, {
     new: true,
+    runValidators: true,
   }).exec();
 };
 
@@ -251,7 +237,7 @@ const getSuggestedProducts = async (userId?: string) => {
   try {
     let favoriteCategories: string[] = [];
 
-    if (userId) {
+    if (userId && Types.ObjectId.isValid(userId)) {
       const user = await User.findById(userId)
         .select("favoriteCategories")
         .lean<IUser>();
