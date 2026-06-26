@@ -39,6 +39,7 @@ npm run dev
 npm run build
 npm run start
 npm run typecheck
+npm run validate:openapi
 ```
 
 ## Production checklist
@@ -49,11 +50,14 @@ npm run typecheck
 - Rotate `JWT_SECRET` and `AUCTION_ADMIN_TOKEN`.
 - Add request logging, audit logging and backup/restore procedures.
 - Run `npm audit` and upgrade vulnerable packages before release.
+- Run `npm run validate:openapi` in CI alongside typecheck, tests and build.
+- Keep `.github/workflows/ci.yml` required on pull requests so typecheck, tests, OpenAPI validation and audit stay green.
 
 Current implementation notes:
 
 - Basic structured request logging is enabled.
 - Audit logs are emitted for order, product and category create/update/delete flows.
+- OpenAPI includes explicit order and location schemas and is validated by `scripts/validate-openapi.js`.
 
 ## Legal and compliance scope
 
