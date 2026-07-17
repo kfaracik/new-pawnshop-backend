@@ -5,6 +5,7 @@ type AppEnv = {
   jwtSecret: string;
   corsOrigins: string[];
   corsAllowRenderPreviews: boolean;
+  corsAllowVercelPreviews: boolean;
   corsAllowLocalhost: boolean;
   enableApiDocs: boolean;
   auctionAdminToken?: string;
@@ -36,6 +37,7 @@ export const env: AppEnv = {
   jwtSecret: requireEnv("JWT_SECRET"),
   corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
   corsAllowRenderPreviews: parseBoolean(process.env.CORS_ALLOW_RENDER_PREVIEWS, process.env.NODE_ENV !== "production"),
+  corsAllowVercelPreviews: parseBoolean(process.env.CORS_ALLOW_VERCEL_PREVIEWS, process.env.NODE_ENV !== "production"),
   corsAllowLocalhost: parseBoolean(process.env.CORS_ALLOW_LOCALHOST, process.env.NODE_ENV !== "production"),
   enableApiDocs: parseBoolean(process.env.ENABLE_API_DOCS, process.env.NODE_ENV !== "production"),
   auctionAdminToken: process.env.AUCTION_ADMIN_TOKEN,

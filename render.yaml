@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: new-pawnshop-backend
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: AUCTION_ADMIN_TOKEN
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: CORS_ALLOW_VERCEL_PREVIEWS
+        value: "true"
+      - key: CORS_ALLOW_RENDER_PREVIEWS
+        value: "false"
+      - key: ENABLE_API_DOCS
+        value: "false"

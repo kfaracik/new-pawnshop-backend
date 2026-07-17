@@ -21,12 +21,6 @@ const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("../swaggerConfig");
 const app: Application = express();
 const DB_BOOTSTRAP_RETRY_MS = 30_000;
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: env.nodeEnv === "production" ? 20 : 200,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: env.nodeEnv === "production" ? 300 : 2_000,
@@ -52,6 +46,15 @@ const isAllowedRenderPreviewOrigin = (origin: string) => {
   }
 };
 
+const isAllowedVercelPreviewOrigin = (origin: string) => {
+  try {
+    const { hostname, protocol } = new URL(origin);
+    return protocol === "https:" && hostname.endsWith(".vercel.app");
+  } catch {
+    return false;
+  }
+};
+
 const corsOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
   if (!origin) {
     callback(null, true);
@@ -69,6 +72,11 @@ const corsOrigin = (origin: string | undefined, callback: (err: Error | null, al
   }
 
   if (env.corsAllowRenderPreviews && isAllowedRenderPreviewOrigin(origin)) {
+    callback(null, true);
+    return;
+  }
+
+  if (env.corsAllowVercelPreviews && isAllowedVercelPreviewOrigin(origin)) {
     callback(null, true);
     return;
   }
@@ -151,7 +159,7 @@ app.get("/health", (_req, res) => {
 app.use("/api", apiLimiter);
 
 app.use("/api/v1/products", requireDatabase, productRoutes);
-app.use("/api/v1/auth", authLimiter, authRoutes);
+app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/categories", requireDatabase, categoryRoutes);
 app.use("/api/v1/locations", requireDatabase, locationRoutes);
 app.use("/api/v1/orders", requireDatabase, orderRoutes);
@@ -159,7 +167,7 @@ app.use("/api/v1/auctions", requireDatabase, auctionRoutes);
 
 // Backward compatibility for existing clients.
 app.use("/api/products", requireDatabase, productRoutes);
-app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/category", requireDatabase, categoryRoutes);
 app.use("/api/categories", requireDatabase, categoryRoutes);
 app.use("/api/locations", requireDatabase, locationRoutes);

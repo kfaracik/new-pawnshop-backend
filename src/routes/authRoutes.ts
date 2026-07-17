@@ -1,8 +1,17 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import authController from "../controllers/authController";
 import { authenticateUser } from "../middlewares/authenticateUser";
+import { env } from "../config/env";
 
 const router = Router();
+
+const credentialsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: env.nodeEnv === "production" ? 20 : 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 /**
  * @swagger
@@ -157,8 +166,8 @@ const router = Router();
 
 
 router.get("/user", authenticateUser, authController.getUserData);
-router.post("/register", authController.register);
-router.post("/login", authController.login);
+router.post("/register", credentialsLimiter, authController.register);
+router.post("/login", credentialsLimiter, authController.login);
 router.post("/logout", authenticateUser, authController.logout);
 
 export default router;
