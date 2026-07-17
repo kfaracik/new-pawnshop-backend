@@ -1,5 +1,5 @@
-app = "new-pawnshop-backend"
-primary_region = "waw"
+app = "new-pawnshop-api"
+primary_region = "arn"
 
 [build]
   dockerfile = "Dockerfile"
