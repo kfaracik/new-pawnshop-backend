@@ -4,6 +4,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import productRoutes from "./routes/productRoutes";
 import authRoutes from "./routes/authRoutes";
+import accountRoutes from "./routes/accountRoutes";
 import { connectDB } from "./config/db";
 import { env } from "./config/env";
 import errorHandler from "./middlewares/errorHandler";
@@ -169,6 +170,7 @@ app.use("/api", apiLimiter);
 
 app.use("/api/v1/products", requireDatabase, productRoutes);
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/account", requireDatabase, accountRoutes);
 app.use("/api/v1/categories", requireDatabase, categoryRoutes);
 app.use("/api/v1/locations", requireDatabase, locationRoutes);
 app.use("/api/v1/orders", requireDatabase, orderRoutes);
@@ -177,6 +179,7 @@ app.use("/api/v1/auctions", requireDatabase, auctionRoutes);
 // Backward compatibility for existing clients.
 app.use("/api/products", requireDatabase, productRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/account", requireDatabase, accountRoutes);
 app.use("/api/category", requireDatabase, categoryRoutes);
 app.use("/api/categories", requireDatabase, categoryRoutes);
 app.use("/api/locations", requireDatabase, locationRoutes);

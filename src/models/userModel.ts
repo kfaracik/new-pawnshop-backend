@@ -24,6 +24,14 @@ const UserSchema = new Schema(
       ref: "Category",
       default: [],
     },
+    name: { type: String, trim: true, default: "" },
+    phone: { type: String, trim: true, default: "" },
+    address: {
+      streetAddress: { type: String, trim: true, default: "" },
+      city: { type: String, trim: true, default: "" },
+      postalCode: { type: String, trim: true, default: "" },
+      country: { type: String, trim: true, default: "" },
+    },
     isAdmin: {
       type: Boolean,
       default: false,
@@ -38,11 +46,21 @@ const UserSchema = new Schema(
 
 export const User: Model<any> = models.User || model("User", UserSchema);
 
+export type IUserAddress = {
+  streetAddress: string;
+  city: string;
+  postalCode: string;
+  country: string;
+};
+
 export type IUser = {
   _id: string;
   email: string;
   password: string;
   favoriteCategories: string[];
+  name: string;
+  phone: string;
+  address: IUserAddress;
   isAdmin: boolean;
   tokenVersion: number;
 };
