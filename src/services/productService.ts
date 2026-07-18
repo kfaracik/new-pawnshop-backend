@@ -145,8 +145,12 @@ const getProducts = async (skip: number, limit: number, category?: string) => {
   return enrichProductsWithAvailability(products as any[]);
 };
 
-const getProduct = async (id: string) => {
-  const product = await Product.findById(id).populate("category", "name").exec();
+const getProduct = async (id: string, options: { trackView?: boolean } = {}) => {
+  const product = options.trackView
+    ? await Product.findByIdAndUpdate(id, { $inc: { views: 1 } }, { new: true })
+        .populate("category", "name")
+        .exec()
+    : await Product.findById(id).populate("category", "name").exec();
   if (!product) return null;
   const [enriched] = await enrichProductsWithAvailability([product as any]);
   return enriched;
@@ -168,6 +172,25 @@ const getNewProducts = async () => {
   }).exec();
 
   return enrichProductsWithAvailability(products as any[]);
+};
+
+const getFeaturedProducts = async (limit = 8) => {
+  const featured = await Product.find({ isFeatured: true })
+    .sort({ updatedAt: -1 })
+    .limit(limit)
+    .exec();
+
+  if (featured.length >= limit) {
+    return enrichProductsWithAvailability(featured as any[]);
+  }
+
+  const featuredIds = featured.map((product) => product._id);
+  const fillers = await Product.find({ _id: { $nin: featuredIds } })
+    .sort({ createdAt: -1 })
+    .limit(limit - featured.length)
+    .exec();
+
+  return enrichProductsWithAvailability([...featured, ...fillers] as any[]);
 };
 
 const searchProducts = async (
@@ -266,7 +289,7 @@ const getSuggestedProducts = async (userId?: string) => {
 
 const getPopularProducts = async (limit: number) => {
   const products = await Product.find({})
-    .sort({ price: -1 })
+    .sort({ salesCount: -1, views: -1, createdAt: -1 })
     .limit(limit)
     .exec();
 
@@ -278,6 +301,7 @@ export default {
   getProduct,
   getTotalProducts,
   getNewProducts,
+  getFeaturedProducts,
   searchProducts,
   createProduct,
   updateProduct,

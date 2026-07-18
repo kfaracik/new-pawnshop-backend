@@ -262,6 +262,18 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
       );
 
       createdOrder = newOrder;
+
+      if (orderProducts.length > 0) {
+        await Product.bulkWrite(
+          orderProducts.map((product) => ({
+            updateOne: {
+              filter: { _id: product.productId },
+              update: { $inc: { salesCount: Number(product.quantity) || 0 } },
+            },
+          })),
+          { session }
+        );
+      }
     });
 
     logAudit("order_created", {

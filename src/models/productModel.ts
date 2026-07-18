@@ -37,6 +37,20 @@ const ProductSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    isFeatured: {
+      type: Boolean,
+      default: false,
+    },
+    views: {
+      type: Number,
+      default: 0,
+      min: [0, "Views cannot be negative"],
+    },
+    salesCount: {
+      type: Number,
+      default: 0,
+      min: [0, "Sales count cannot be negative"],
+    },
     auctionLink: {
       type: String,
       default: null,

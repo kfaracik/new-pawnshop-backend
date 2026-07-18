@@ -39,7 +39,9 @@ const getProduct = async (req: Request, res: Response, next: NextFunction) => {
     if (!Types.ObjectId.isValid(id)) {
       return res.status(400).json({ error: "Invalid product id" });
     }
-    const product = await ProductService.getProduct(id);
+    const trackView =
+      getSingleValue(req.query.trackView as string | string[] | undefined) === "1";
+    const product = await ProductService.getProduct(id, { trackView });
 
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
@@ -97,6 +99,20 @@ const getNewProducts = async (
   try {
     const newProducts = await ProductService.getNewProducts();
     res.status(200).json(newProducts);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getFeaturedProducts = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const limit = parsePositiveInteger(req.query.limit, 8, 24);
+    const featuredProducts = await ProductService.getFeaturedProducts(limit);
+    res.status(200).json(featuredProducts);
   } catch (error) {
     next(error);
   }
@@ -230,6 +246,7 @@ export default {
   getAllProducts,
   getProduct,
   getNewProducts,
+  getFeaturedProducts,
   getSuggestedProducts,
   getPopularProducts,
   searchProducts,

@@ -10,6 +10,7 @@ export type ProductInput = {
   stock?: number;
   quantity?: number;
   isAuction?: boolean;
+  isFeatured?: boolean;
   auctionLink?: string | null;
   availabilityMode?: string;
   availableLocations?: string[];
@@ -66,6 +67,7 @@ export const normalizeProductInput = (body: Record<string, unknown> = {}) => {
   if (category !== undefined) input.category = category;
   if (properties !== undefined) input.properties = properties;
   if (typeof body.isAuction === "boolean") input.isAuction = body.isAuction;
+  if (typeof body.isFeatured === "boolean") input.isFeatured = body.isFeatured;
   if (auctionLink !== undefined) input.auctionLink = auctionLink;
   if (availabilityMode !== undefined) input.availabilityMode = availabilityMode;
 
