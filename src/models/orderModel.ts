@@ -81,6 +81,7 @@ const OrderSchema = new Schema(
     paid: { type: Boolean, default: false },
     reservationExpiresAt: { type: Date, default: null },
     paymentNotes: { type: String, default: "" },
+    paymentSessionId: { type: String, default: null },
   },
   { timestamps: true }
 );

@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY tsconfig.json swaggerConfig.js ./
 COPY src ./src
-RUN npm ci
+RUN npm install --no-audit --no-fund
 RUN npm prune --omit=dev
 
 FROM node:22-slim AS runtime

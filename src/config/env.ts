@@ -9,6 +9,8 @@ type AppEnv = {
   corsAllowLocalhost: boolean;
   enableApiDocs: boolean;
   auctionAdminToken?: string;
+  stripeSecretKey?: string;
+  frontendBaseUrl: string;
 };
 
 const parseCorsOrigins = (value: string | undefined) =>
@@ -41,4 +43,10 @@ export const env: AppEnv = {
   corsAllowLocalhost: parseBoolean(process.env.CORS_ALLOW_LOCALHOST, process.env.NODE_ENV !== "production"),
   enableApiDocs: parseBoolean(process.env.ENABLE_API_DOCS, process.env.NODE_ENV !== "production"),
   auctionAdminToken: process.env.AUCTION_ADMIN_TOKEN,
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY?.trim() || undefined,
+  frontendBaseUrl: (
+    process.env.FRONTEND_BASE_URL ||
+    parseCorsOrigins(process.env.CORS_ORIGINS)[0] ||
+    "http://localhost:3000"
+  ).replace(/\/+$/, ""),
 };

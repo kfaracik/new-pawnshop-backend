@@ -1,5 +1,6 @@
 import { Router } from "express";
 import orderController from "../controllers/orderController";
+import paymentController from "../controllers/paymentController";
 import { isAdmin } from "../middlewares/authAdmin";
 import { authenticateUser, optionallyAuthenticateUser } from "../middlewares/authenticateUser";
 
@@ -172,6 +173,8 @@ const router = Router();
 router.get("/", authenticateUser, isAdmin, orderController.getAllOrders);
 router.get("/my", authenticateUser, orderController.getMyOrders);
 router.post("/", optionallyAuthenticateUser, orderController.createOrder);
+router.post("/:id/checkout-session", optionallyAuthenticateUser, paymentController.createCheckoutSession);
+router.post("/:id/confirm-payment", optionallyAuthenticateUser, paymentController.confirmPayment);
 router.put("/:id", authenticateUser, isAdmin, orderController.updateOrder);
 router.delete("/:id", authenticateUser, isAdmin, orderController.deleteOrder);
 
