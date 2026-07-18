@@ -2,12 +2,14 @@ import { Request, Response, NextFunction } from "express";
 import { Types } from "mongoose";
 import { Order } from "../models/orderModel";
 import {
+  constructWebhookEvent,
   createCheckoutSessionForOrder,
   isStripeConfigured,
+  isStripeWebhookConfigured,
   retrieveCheckoutSession,
 } from "../services/stripeService";
 import { getSingleValue } from "../utils/request";
-import { logAudit } from "../utils/logger";
+import { logAudit, logError } from "../utils/logger";
 
 const isPaidOrder = (order: any) =>
   order?.paid === true || order?.paymentStatus === "paid";
@@ -142,7 +144,92 @@ const confirmPayment = async (
   }
 };
 
+const expectedOrderAmount = (order: any) =>
+  (order.products || []).reduce(
+    (sum: number, product: any) =>
+      sum + Math.round(Number(product.price) * 100) * Number(product.quantity),
+    0
+  ) + Math.round(Number(order.deliveryPrice || 0) * 100);
+
+const markOrderPaidFromSession = async (session: any) => {
+  const orderId = session?.metadata?.orderId;
+  if (!orderId || !Types.ObjectId.isValid(String(orderId))) {
+    return;
+  }
+
+  const order = await Order.findById(orderId);
+  if (!order || isPaidOrder(order)) {
+    return;
+  }
+
+  if (session.payment_status !== "paid") {
+    return;
+  }
+
+  if (
+    session.currency !== "pln" ||
+    Number(session.amount_total) !== expectedOrderAmount(order)
+  ) {
+    logError("stripe_webhook_amount_mismatch", {
+      orderId: String(order._id),
+      sessionId: session.id,
+    });
+    return;
+  }
+
+  order.paymentStatus = "paid";
+  order.paid = true;
+  if (order.orderStatus === "pending_payment") {
+    order.orderStatus = "paid";
+  }
+  order.reservationExpiresAt = null;
+  await order.save();
+
+  logAudit("payment_confirmed_webhook", {
+    orderId: String(order._id),
+    sessionId: session.id,
+  });
+};
+
+const handleStripeWebhook = async (req: Request, res: Response) => {
+  if (!isStripeWebhookConfigured()) {
+    return res.status(503).json({ message: "Stripe webhook not configured." });
+  }
+
+  const signature = req.headers["stripe-signature"];
+  if (!signature) {
+    return res.status(400).json({ message: "Missing Stripe signature." });
+  }
+
+  let event;
+  try {
+    event = constructWebhookEvent(req.body as Buffer, String(signature));
+  } catch (error) {
+    logError("stripe_webhook_signature_failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return res.status(400).json({ message: "Invalid Stripe signature." });
+  }
+
+  try {
+    if (
+      event.type === "checkout.session.completed" ||
+      event.type === "checkout.session.async_payment_succeeded"
+    ) {
+      await markOrderPaidFromSession(event.data.object);
+    }
+  } catch (error) {
+    logError("stripe_webhook_handler_failed", {
+      eventType: event.type,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  return res.status(200).json({ received: true });
+};
+
 export default {
   createCheckoutSession,
   confirmPayment,
+  handleStripeWebhook,
 };

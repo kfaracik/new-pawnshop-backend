@@ -10,6 +10,7 @@ type AppEnv = {
   enableApiDocs: boolean;
   auctionAdminToken?: string;
   stripeSecretKey?: string;
+  stripeWebhookSecret?: string;
   frontendBaseUrl: string;
 };
 
@@ -44,6 +45,7 @@ export const env: AppEnv = {
   enableApiDocs: parseBoolean(process.env.ENABLE_API_DOCS, process.env.NODE_ENV !== "production"),
   auctionAdminToken: process.env.AUCTION_ADMIN_TOKEN,
   stripeSecretKey: process.env.STRIPE_SECRET_KEY?.trim() || undefined,
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET?.trim() || undefined,
   frontendBaseUrl: (
     process.env.FRONTEND_BASE_URL ||
     parseCorsOrigins(process.env.CORS_ORIGINS)[0] ||

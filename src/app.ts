@@ -13,6 +13,7 @@ import orderRoutes from "./routes/orderRoutes";
 import categoryRoutes from "./routes/categoryRoutes";
 import auctionRoutes from "./routes/auctionRoutes";
 import locationRoutes from "./routes/locationRoutes";
+import paymentController from "./controllers/paymentController";
 import { startAuctionScheduler } from "./services/auctionService";
 import { startOrderReservationScheduler } from "./services/orderReservationService";
 import { logError, logWarn } from "./utils/logger";
@@ -92,6 +93,14 @@ app.use(
     crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
+const stripeWebhookHandler = [
+  express.raw({ type: "application/json" }),
+  requireDatabase,
+  paymentController.handleStripeWebhook,
+];
+app.post("/api/stripe/webhook", ...stripeWebhookHandler);
+app.post("/api/v1/stripe/webhook", ...stripeWebhookHandler);
+
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 app.use(requestLogger);

@@ -5,6 +5,25 @@ let stripeClient: Stripe | null = null;
 
 export const isStripeConfigured = () => Boolean(env.stripeSecretKey);
 
+export const isStripeWebhookConfigured = () =>
+  Boolean(env.stripeSecretKey && env.stripeWebhookSecret);
+
+export const constructWebhookEvent = (
+  payload: Buffer | string,
+  signature: string
+): Stripe.Event => {
+  const stripe = getStripe();
+  if (!stripe || !env.stripeWebhookSecret) {
+    throw new Error("STRIPE_WEBHOOK_NOT_CONFIGURED");
+  }
+
+  return stripe.webhooks.constructEvent(
+    payload,
+    signature,
+    env.stripeWebhookSecret
+  );
+};
+
 export const getStripe = (): Stripe | null => {
   if (!env.stripeSecretKey) {
     return null;
