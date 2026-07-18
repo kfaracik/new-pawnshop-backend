@@ -4,31 +4,13 @@ import ProductService from "../services/productService";
 import { getSingleValue, parsePagination, parsePositiveInteger } from "../utils/request";
 import { logAudit, logError } from "../utils/logger";
 import { normalizeProductInput, validateProductInput } from "../utils/product";
+import { createViewThrottle } from "../utils/viewThrottle";
 
-const VIEW_THROTTLE_MS = 10 * 60 * 1000;
-const VIEW_THROTTLE_MAX_ENTRIES = 20_000;
-const recentViews = new Map<string, number>();
+const viewThrottle = createViewThrottle();
 
 const shouldCountView = (req: Request, productId: string) => {
   const ip = req.ip || req.socket?.remoteAddress || "unknown";
-  const key = `${ip}:${productId}`;
-  const now = Date.now();
-  const last = recentViews.get(key);
-
-  if (last && now - last < VIEW_THROTTLE_MS) {
-    return false;
-  }
-
-  if (recentViews.size > VIEW_THROTTLE_MAX_ENTRIES) {
-    for (const [entryKey, timestamp] of recentViews) {
-      if (now - timestamp >= VIEW_THROTTLE_MS) {
-        recentViews.delete(entryKey);
-      }
-    }
-  }
-
-  recentViews.set(key, now);
-  return true;
+  return viewThrottle.shouldCount(`${ip}:${productId}`);
 };
 
 const getAllProducts = async (

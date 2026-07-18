@@ -7,6 +7,7 @@ import { sanitizeHtml } from "../utils/html";
 import { buildSearchRegex } from "../utils/search";
 import { logError } from "../utils/logger";
 import { isActiveReservationPaymentStatus } from "../utils/checkout";
+import { buildSalesIncrementOps, buildSalesDecrementOps } from "../utils/orderSales";
 import type { ProductInput } from "../utils/product";
 
 const enrichProductsWithAvailability = async (products: any[]) => {
@@ -295,12 +296,7 @@ const recordOrderSales = async (order: any, session?: any) => {
   const products = order.products || [];
   if (products.length > 0) {
     await Product.bulkWrite(
-      products.map((product: any) => ({
-        updateOne: {
-          filter: { _id: product.productId },
-          update: { $inc: { salesCount: Number(product.quantity) || 0 } },
-        },
-      })),
+      buildSalesIncrementOps(products),
       session ? { session } : undefined
     );
   }
@@ -316,23 +312,7 @@ const reverseOrderSales = async (order: any, session?: any) => {
   const products = order.products || [];
   if (products.length > 0) {
     await Product.bulkWrite(
-      products.map((product: any) => ({
-        updateOne: {
-          filter: { _id: product.productId },
-          update: [
-            {
-              $set: {
-                salesCount: {
-                  $max: [
-                    0,
-                    { $subtract: ["$salesCount", Number(product.quantity) || 0] },
-                  ],
-                },
-              },
-            },
-          ],
-        },
-      })),
+      buildSalesDecrementOps(products),
       session ? { session } : undefined
     );
   }

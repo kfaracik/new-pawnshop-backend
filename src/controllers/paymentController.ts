@@ -13,6 +13,7 @@ import { getSingleValue } from "../utils/request";
 import { logAudit, logError } from "../utils/logger";
 import ProductService from "../services/productService";
 import { sendOrderConfirmation } from "../services/mailService";
+import { computeOrderAmountCents } from "../utils/payment";
 
 const isPaidOrder = (order: any) =>
   order?.paid === true || order?.paymentStatus === "paid";
@@ -107,12 +108,7 @@ const confirmPayment = async (
         .json({ message: "Payment session does not match this order." });
     }
 
-    const expectedAmount =
-      (order.products || []).reduce(
-        (sum: number, product: any) =>
-          sum + Math.round(Number(product.price) * 100) * Number(product.quantity),
-        0
-      ) + Math.round(Number(order.deliveryPrice || 0) * 100);
+    const expectedAmount = computeOrderAmountCents(order);
 
     if (session.currency !== "pln" || Number(session.amount_total) !== expectedAmount) {
       return res
@@ -149,12 +145,7 @@ const confirmPayment = async (
   }
 };
 
-const expectedOrderAmount = (order: any) =>
-  (order.products || []).reduce(
-    (sum: number, product: any) =>
-      sum + Math.round(Number(product.price) * 100) * Number(product.quantity),
-    0
-  ) + Math.round(Number(order.deliveryPrice || 0) * 100);
+const expectedOrderAmount = (order: any) => computeOrderAmountCents(order);
 
 const markOrderPaidFromSession = async (session: any) => {
   const orderId = session?.metadata?.orderId;
