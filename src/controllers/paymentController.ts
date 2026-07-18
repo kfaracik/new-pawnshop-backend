@@ -96,10 +96,23 @@ const confirmPayment = async (
 
     const session = await retrieveCheckoutSession(String(sessionId));
 
-    if (session.metadata?.orderId && session.metadata.orderId !== String(order._id)) {
+    if (session.metadata?.orderId !== String(order._id)) {
       return res
         .status(400)
         .json({ message: "Payment session does not match this order." });
+    }
+
+    const expectedAmount =
+      (order.products || []).reduce(
+        (sum: number, product: any) =>
+          sum + Math.round(Number(product.price) * 100) * Number(product.quantity),
+        0
+      ) + Math.round(Number(order.deliveryPrice || 0) * 100);
+
+    if (session.currency !== "pln" || Number(session.amount_total) !== expectedAmount) {
+      return res
+        .status(400)
+        .json({ message: "Payment amount does not match this order." });
     }
 
     if (session.payment_status === "paid") {
