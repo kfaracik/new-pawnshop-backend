@@ -3,6 +3,7 @@ import mongoose, { Types } from "mongoose";
 import { Order } from "../models/orderModel";
 import { Product } from "../models/productModel";
 import { getReservationExpiresAt } from "../services/orderReservationService";
+import ProductService from "../services/productService";
 import { logAudit } from "../utils/logger";
 import {
   getDeliveryEtaLabel,
@@ -262,18 +263,6 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
       );
 
       createdOrder = newOrder;
-
-      if (orderProducts.length > 0) {
-        await Product.bulkWrite(
-          orderProducts.map((product) => ({
-            updateOne: {
-              filter: { _id: product.productId },
-              update: { $inc: { salesCount: Number(product.quantity) || 0 } },
-            },
-          })),
-          { session }
-        );
-      }
     });
 
     logAudit("order_created", {
@@ -360,6 +349,7 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
           order.orderStatus = "paid";
         }
         order.reservationExpiresAt = null;
+        await ProductService.recordOrderSales(order, session);
       } else if (UNPAID_PAYMENT_STATUSES.has(order.paymentStatus) && typeof paid !== "boolean") {
         order.paid = false;
       }

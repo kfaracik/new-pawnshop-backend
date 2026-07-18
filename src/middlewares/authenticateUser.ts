@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { timingSafeEqual } from "crypto";
 import { User } from "../models/userModel";
 import { env } from "../config/env";
 import { verifyAccessToken } from "../utils/auth";
@@ -6,12 +7,19 @@ import { verifyAccessToken } from "../utils/auth";
 const getTokenFromRequest = (req: Request) =>
   req.header("Authorization")?.match(/^Bearer\s+(.+)$/i)?.[1] || "";
 
+const safeEqual = (a: string, b: string) => {
+  const bufferA = Buffer.from(a);
+  const bufferB = Buffer.from(b);
+  if (bufferA.length !== bufferB.length) return false;
+  return timingSafeEqual(bufferA, bufferB);
+};
+
 const resolveUserFromToken = async (token: string) => {
   const serviceAdminToken = env.auctionAdminToken;
 
   if (!token) return null;
 
-  if (serviceAdminToken && token === serviceAdminToken) {
+  if (serviceAdminToken && safeEqual(token, serviceAdminToken)) {
     return {
       _id: "service-admin",
       email: "service-admin@internal.local",

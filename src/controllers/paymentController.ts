@@ -10,6 +10,7 @@ import {
 } from "../services/stripeService";
 import { getSingleValue } from "../utils/request";
 import { logAudit, logError } from "../utils/logger";
+import ProductService from "../services/productService";
 
 const isPaidOrder = (order: any) =>
   order?.paid === true || order?.paymentStatus === "paid";
@@ -124,6 +125,7 @@ const confirmPayment = async (
         order.orderStatus = "paid";
       }
       order.reservationExpiresAt = null;
+      await ProductService.recordOrderSales(order);
       await order.save();
 
       logAudit("payment_confirmed", {
@@ -183,6 +185,7 @@ const markOrderPaidFromSession = async (session: any) => {
     order.orderStatus = "paid";
   }
   order.reservationExpiresAt = null;
+  await ProductService.recordOrderSales(order);
   await order.save();
 
   logAudit("payment_confirmed_webhook", {

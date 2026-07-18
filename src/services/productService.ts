@@ -287,6 +287,27 @@ const getSuggestedProducts = async (userId?: string) => {
   }
 };
 
+const recordOrderSales = async (order: any, session?: any) => {
+  if (!order || order.salesCounted) {
+    return;
+  }
+
+  const products = order.products || [];
+  if (products.length > 0) {
+    await Product.bulkWrite(
+      products.map((product: any) => ({
+        updateOne: {
+          filter: { _id: product.productId },
+          update: { $inc: { salesCount: Number(product.quantity) || 0 } },
+        },
+      })),
+      session ? { session } : undefined
+    );
+  }
+
+  order.salesCounted = true;
+};
+
 const getPopularProducts = async (limit: number) => {
   const products = await Product.find({})
     .sort({ salesCount: -1, views: -1, createdAt: -1 })
@@ -302,6 +323,7 @@ export default {
   getTotalProducts,
   getNewProducts,
   getFeaturedProducts,
+  recordOrderSales,
   searchProducts,
   createProduct,
   updateProduct,

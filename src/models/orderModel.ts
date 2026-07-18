@@ -82,6 +82,7 @@ const OrderSchema = new Schema(
     reservationExpiresAt: { type: Date, default: null },
     paymentNotes: { type: String, default: "" },
     paymentSessionId: { type: String, default: null },
+    salesCounted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
