@@ -28,6 +28,10 @@ const UserSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    tokenVersion: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );
@@ -40,4 +44,5 @@ export type IUser = {
   password: string;
   favoriteCategories: string[];
   isAdmin: boolean;
+  tokenVersion: number;
 };

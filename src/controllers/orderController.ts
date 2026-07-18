@@ -4,6 +4,7 @@ import { Order } from "../models/orderModel";
 import { Product } from "../models/productModel";
 import { getReservationExpiresAt } from "../services/orderReservationService";
 import ProductService from "../services/productService";
+import { sendOrderConfirmation } from "../services/mailService";
 import { logAudit } from "../utils/logger";
 import {
   getDeliveryEtaLabel,
@@ -296,6 +297,7 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
     const id = getSingleValue(req.params.id);
     const { orderStatus, paymentStatus, paid } = req.body || {};
     let updatedOrder: any = null;
+    let shouldEmailConfirmation = false;
 
     if (!id) {
       return res.status(400).json({ message: "Order id is required" });
@@ -321,6 +323,7 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
       }
 
       const previousOrderStatus = order.orderStatus;
+      const previousPaymentStatus = order.paymentStatus;
       const wasActiveReservation = isActiveReservedOrder(order);
 
       if (orderStatus) {
@@ -343,12 +346,17 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
         order.paid = paid;
       }
 
+      let becamePaid = false;
       if (PAID_PAYMENT_STATUSES.has(order.paymentStatus)) {
         order.paid = true;
         if (order.orderStatus === "pending_payment") {
           order.orderStatus = "paid";
         }
         order.reservationExpiresAt = null;
+        becamePaid = !order.salesCounted;
+        if (becamePaid) {
+          shouldEmailConfirmation = true;
+        }
         await ProductService.recordOrderSales(order, session);
       } else if (UNPAID_PAYMENT_STATUSES.has(order.paymentStatus) && typeof paid !== "boolean") {
         order.paid = false;
@@ -363,6 +371,18 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
         STOCK_RESTORE_ORDER_STATUSES.has(order.orderStatus) &&
         !STOCK_RESTORE_ORDER_STATUSES.has(previousOrderStatus);
 
+      const becameRefunded =
+        order.paymentStatus === "refunded" &&
+        previousPaymentStatus !== "refunded";
+
+      if (becameRefunded) {
+        if (!shouldRestoreStock) {
+          await restoreOrderStock(order, session);
+        }
+        await ProductService.reverseOrderSales(order, session);
+        order.paid = false;
+      }
+
       if (shouldRestoreStock) {
         await restoreOrderStock(order, session);
       }
@@ -370,6 +390,10 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
       await order.save({ session });
       updatedOrder = order.toObject();
     });
+
+    if (shouldEmailConfirmation && updatedOrder) {
+      void sendOrderConfirmation(updatedOrder);
+    }
 
     logAudit("order_updated", {
       orderId: updatedOrder?._id,

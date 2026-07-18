@@ -5,6 +5,32 @@ import { getSingleValue, parsePagination, parsePositiveInteger } from "../utils/
 import { logAudit, logError } from "../utils/logger";
 import { normalizeProductInput, validateProductInput } from "../utils/product";
 
+const VIEW_THROTTLE_MS = 10 * 60 * 1000;
+const VIEW_THROTTLE_MAX_ENTRIES = 20_000;
+const recentViews = new Map<string, number>();
+
+const shouldCountView = (req: Request, productId: string) => {
+  const ip = req.ip || req.socket?.remoteAddress || "unknown";
+  const key = `${ip}:${productId}`;
+  const now = Date.now();
+  const last = recentViews.get(key);
+
+  if (last && now - last < VIEW_THROTTLE_MS) {
+    return false;
+  }
+
+  if (recentViews.size > VIEW_THROTTLE_MAX_ENTRIES) {
+    for (const [entryKey, timestamp] of recentViews) {
+      if (now - timestamp >= VIEW_THROTTLE_MS) {
+        recentViews.delete(entryKey);
+      }
+    }
+  }
+
+  recentViews.set(key, now);
+  return true;
+};
+
 const getAllProducts = async (
   req: Request,
   res: Response,
@@ -40,7 +66,8 @@ const getProduct = async (req: Request, res: Response, next: NextFunction) => {
       return res.status(400).json({ error: "Invalid product id" });
     }
     const trackView =
-      getSingleValue(req.query.trackView as string | string[] | undefined) === "1";
+      getSingleValue(req.query.trackView as string | string[] | undefined) === "1" &&
+      shouldCountView(req, id);
     const product = await ProductService.getProduct(id, { trackView });
 
     if (!product) {

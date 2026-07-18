@@ -10,6 +10,7 @@ export type AccessTokenPayload = {
   sub?: string;
   email?: string;
   type?: string;
+  tv?: number;
 };
 
 export const normalizeEmail = (value: unknown) =>
@@ -32,12 +33,17 @@ export const validatePassword = (value: unknown) => {
   return "";
 };
 
-export const createAccessToken = (user: { _id: unknown; email?: string }) =>
+export const createAccessToken = (user: {
+  _id: unknown;
+  email?: string;
+  tokenVersion?: number;
+}) =>
   jwt.sign(
     {
       id: String(user._id),
       email: user.email,
       type: "access",
+      tv: Number(user.tokenVersion || 0),
     },
     env.jwtSecret,
     {

@@ -308,6 +308,38 @@ const recordOrderSales = async (order: any, session?: any) => {
   order.salesCounted = true;
 };
 
+const reverseOrderSales = async (order: any, session?: any) => {
+  if (!order || !order.salesCounted) {
+    return;
+  }
+
+  const products = order.products || [];
+  if (products.length > 0) {
+    await Product.bulkWrite(
+      products.map((product: any) => ({
+        updateOne: {
+          filter: { _id: product.productId },
+          update: [
+            {
+              $set: {
+                salesCount: {
+                  $max: [
+                    0,
+                    { $subtract: ["$salesCount", Number(product.quantity) || 0] },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      })),
+      session ? { session } : undefined
+    );
+  }
+
+  order.salesCounted = false;
+};
+
 const getPopularProducts = async (limit: number) => {
   const products = await Product.find({})
     .sort({ salesCount: -1, views: -1, createdAt: -1 })
@@ -324,6 +356,7 @@ export default {
   getNewProducts,
   getFeaturedProducts,
   recordOrderSales,
+  reverseOrderSales,
   searchProducts,
   createProduct,
   updateProduct,

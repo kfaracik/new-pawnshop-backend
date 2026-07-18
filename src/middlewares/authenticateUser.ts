@@ -31,8 +31,14 @@ const resolveUserFromToken = async (token: string) => {
   const userId = decoded.sub || decoded.id;
   if (!userId || decoded.type !== "access") return null;
 
-  const user = await User.findById(userId).select("_id email isAdmin");
-  return user || null;
+  const user = await User.findById(userId).select("_id email isAdmin tokenVersion");
+  if (!user) return null;
+
+  if (Number(user.tokenVersion || 0) !== Number(decoded.tv || 0)) {
+    return null;
+  }
+
+  return user;
 };
 
 export const authenticateUser = async (req: Request, res: Response, next: NextFunction) => {
@@ -46,7 +52,7 @@ export const authenticateUser = async (req: Request, res: Response, next: NextFu
     const user = await resolveUserFromToken(token);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(401).json({ message: "Sesja wygasła. Zaloguj się ponownie." });
     }
 
     req.user = user;

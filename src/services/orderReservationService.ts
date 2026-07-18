@@ -4,7 +4,11 @@ import { Order } from "../models/orderModel";
 import { Product } from "../models/productModel";
 import { isActiveReservationPaymentStatus } from "../utils/checkout";
 
-const RESERVATION_WINDOW_MS = 48 * 60 * 60 * 1000;
+const RESERVATION_WINDOW_MINUTES = Math.max(
+  5,
+  Number(process.env.RESERVATION_WINDOW_MINUTES) || 30
+);
+const RESERVATION_WINDOW_MS = RESERVATION_WINDOW_MINUTES * 60 * 1000;
 const SCHEDULER_INTERVAL_MS = 60 * 1000;
 
 export const getReservationExpiresAt = () =>

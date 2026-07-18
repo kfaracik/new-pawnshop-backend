@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { Types } from "mongoose";
 import { Order } from "../models/orderModel";
+import { WebhookEvent } from "../models/webhookEventModel";
 import {
   constructWebhookEvent,
   createCheckoutSessionForOrder,
@@ -11,6 +12,7 @@ import {
 import { getSingleValue } from "../utils/request";
 import { logAudit, logError } from "../utils/logger";
 import ProductService from "../services/productService";
+import { sendOrderConfirmation } from "../services/mailService";
 
 const isPaidOrder = (order: any) =>
   order?.paid === true || order?.paymentStatus === "paid";
@@ -127,6 +129,7 @@ const confirmPayment = async (
       order.reservationExpiresAt = null;
       await ProductService.recordOrderSales(order);
       await order.save();
+      void sendOrderConfirmation(order);
 
       logAudit("payment_confirmed", {
         orderId: String(order._id),
@@ -187,6 +190,7 @@ const markOrderPaidFromSession = async (session: any) => {
   order.reservationExpiresAt = null;
   await ProductService.recordOrderSales(order);
   await order.save();
+  void sendOrderConfirmation(order);
 
   logAudit("payment_confirmed_webhook", {
     orderId: String(order._id),
@@ -215,6 +219,15 @@ const handleStripeWebhook = async (req: Request, res: Response) => {
   }
 
   try {
+    try {
+      await WebhookEvent.create({ eventId: event.id, type: event.type });
+    } catch (dedupeError: any) {
+      if (dedupeError?.code === 11000) {
+        return res.status(200).json({ received: true, duplicate: true });
+      }
+      throw dedupeError;
+    }
+
     if (
       event.type === "checkout.session.completed" ||
       event.type === "checkout.session.async_payment_succeeded"

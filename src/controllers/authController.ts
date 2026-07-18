@@ -10,6 +10,9 @@ import {
 } from "../utils/auth";
 
 const AUTH_FAILED_MESSAGE = "Nieprawidłowy e-mail lub hasło.";
+// Fixed valid bcrypt hash used only to equalize login timing when the account is absent.
+const DUMMY_PASSWORD_HASH =
+  "$2b$10$gBN4IDoAvA0kyi/AvSuKdOKgDAw7fNWncatMyMa9Wd40geKfTwbG.";
 
 export const getUserData = async (req: Request, res: Response) => {
   const user = req.user;
@@ -80,9 +83,13 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       return res.status(401).json({ message: AUTH_FAILED_MESSAGE });
     }
 
-    const user = await User.findOne({ email }).select("+password email isAdmin");
+    const user = await User.findOne({ email }).select(
+      "+password email isAdmin tokenVersion"
+    );
 
     if (!user) {
+      // Equalize response time so a missing account is indistinguishable from a wrong password.
+      await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
       return res.status(401).json({ message: AUTH_FAILED_MESSAGE });
     }
 
@@ -110,7 +117,11 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
   }
 };
 
-export const logout = async (_req: Request, res: Response) => {
+export const logout = async (req: Request, res: Response) => {
+  const userId = req.user?._id;
+  if (userId) {
+    await User.updateOne({ _id: userId }, { $inc: { tokenVersion: 1 } });
+  }
   return res.status(200).json({ message: "Wylogowano pomyślnie." });
 };
 

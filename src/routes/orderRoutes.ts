@@ -1,10 +1,22 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import orderController from "../controllers/orderController";
 import paymentController from "../controllers/paymentController";
 import { isAdmin } from "../middlewares/authAdmin";
 import { authenticateUser, optionallyAuthenticateUser } from "../middlewares/authenticateUser";
 
 const router = Router();
+
+const createOrderLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === "production" ? 12 : 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message:
+      "Zbyt wiele prób złożenia zamówienia. Spróbuj ponownie za kilka minut.",
+  },
+});
 
 /**
  * @swagger
@@ -172,7 +184,7 @@ const router = Router();
 
 router.get("/", authenticateUser, isAdmin, orderController.getAllOrders);
 router.get("/my", authenticateUser, orderController.getMyOrders);
-router.post("/", optionallyAuthenticateUser, orderController.createOrder);
+router.post("/", createOrderLimiter, optionallyAuthenticateUser, orderController.createOrder);
 router.post("/:id/checkout-session", optionallyAuthenticateUser, paymentController.createCheckoutSession);
 router.post("/:id/confirm-payment", optionallyAuthenticateUser, paymentController.confirmPayment);
 router.put("/:id", authenticateUser, isAdmin, orderController.updateOrder);
