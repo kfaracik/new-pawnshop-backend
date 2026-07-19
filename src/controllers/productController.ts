@@ -21,9 +21,10 @@ const getAllProducts = async (
   try {
     const { page, limit, skip } = parsePagination(req.query);
     const category = (req.query.category as string) || "";
+    const sort = getSingleValue(req.query.sort as string | string[] | undefined);
 
     const [products, total] = await Promise.all([
-      ProductService.getProducts(skip, limit, category),
+      ProductService.getProducts(skip, limit, category, sort),
       ProductService.getTotalProducts(category),
     ]);
 
@@ -74,13 +75,15 @@ const searchProducts = async (
   try {
     const query = (req.query.query as string) || "";
     const category = (req.query.category as string) || "";
+    const sort = getSingleValue(req.query.sort as string | string[] | undefined);
     const { page, limit, skip } = parsePagination(req.query);
 
     const { products, totalProducts } = await ProductService.searchProducts(
       query,
       skip,
       limit,
-      category
+      category,
+      sort
     );
 
     res.status(200).json({

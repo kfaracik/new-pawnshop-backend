@@ -4,6 +4,8 @@ import orderController from "../controllers/orderController";
 import paymentController from "../controllers/paymentController";
 import { isAdmin } from "../middlewares/authAdmin";
 import { authenticateUser, optionallyAuthenticateUser } from "../middlewares/authenticateUser";
+import { validateBody } from "../middlewares/validate";
+import { createOrderSchema } from "../validation/orderSchemas";
 
 const router = Router();
 
@@ -183,8 +185,15 @@ const createOrderLimiter = rateLimit({
  */
 
 router.get("/", authenticateUser, isAdmin, orderController.getAllOrders);
+router.get("/stats", authenticateUser, isAdmin, orderController.getOrderStats);
 router.get("/my", authenticateUser, orderController.getMyOrders);
-router.post("/", createOrderLimiter, optionallyAuthenticateUser, orderController.createOrder);
+router.post(
+  "/",
+  createOrderLimiter,
+  optionallyAuthenticateUser,
+  validateBody(createOrderSchema),
+  orderController.createOrder
+);
 router.post("/:id/checkout-session", optionallyAuthenticateUser, paymentController.createCheckoutSession);
 router.post("/:id/confirm-payment", optionallyAuthenticateUser, paymentController.confirmPayment);
 router.put("/:id", authenticateUser, isAdmin, orderController.updateOrder);

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { isAdmin } from "../middlewares/authAdmin";
 import { authenticateUser } from "../middlewares/authenticateUser";
+import { publicCache } from "../middlewares/publicCache";
 import categoryController from "../controllers/categoryController";
 
 const router = Router();
@@ -141,8 +142,8 @@ const router = Router();
  *         description: Internal server error
  */
 
-router.get("/", categoryController.getAllCategories);
-router.get("/tree", categoryController.getCategoryTree);
+router.get("/", publicCache(300, 900), categoryController.getAllCategories);
+router.get("/tree", publicCache(300, 900), categoryController.getCategoryTree);
 router.post("/", authenticateUser, isAdmin, categoryController.createCategory);
 router.put("/:id", authenticateUser, isAdmin, categoryController.updateCategory);
 router.delete(

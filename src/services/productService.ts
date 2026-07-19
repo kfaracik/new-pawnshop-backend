@@ -131,7 +131,23 @@ const enrichProductsWithAvailability = async (products: any[]) => {
   });
 };
 
-const getProducts = async (skip: number, limit: number, category?: string) => {
+const SORT_OPTIONS: Record<string, Record<string, 1 | -1>> = {
+  newest: { createdAt: -1 },
+  oldest: { createdAt: 1 },
+  price_asc: { price: 1, createdAt: -1 },
+  price_desc: { price: -1, createdAt: -1 },
+  popular: { views: -1, salesCount: -1, createdAt: -1 },
+};
+
+export const resolveSort = (sort?: string) =>
+  (sort && SORT_OPTIONS[sort]) || SORT_OPTIONS.newest;
+
+const getProducts = async (
+  skip: number,
+  limit: number,
+  category?: string,
+  sort?: string
+) => {
   const query =
     category && Types.ObjectId.isValid(category)
       ? { category: new Types.ObjectId(category) }
@@ -140,7 +156,7 @@ const getProducts = async (skip: number, limit: number, category?: string) => {
   const products = await Product.find(query, null, {
     skip,
     limit,
-    sort: { createdAt: -1 },
+    sort: resolveSort(sort),
   }).exec();
 
   return enrichProductsWithAvailability(products as any[]);
@@ -198,7 +214,8 @@ const searchProducts = async (
   query: string,
   skip: number,
   limit: number,
-  category?: string
+  category?: string,
+  sort?: string
 ) => {
   const safeRegex = buildSearchRegex(query);
   const filter: any = safeRegex
@@ -217,7 +234,7 @@ const searchProducts = async (
   const productsPromise = Product.find(filter)
     .skip(skip)
     .limit(limit)
-    .sort({ createdAt: -1 })
+    .sort(resolveSort(sort))
     .exec();
   const totalProductsPromise = Product.countDocuments(filter).exec();
 

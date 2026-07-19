@@ -91,4 +91,11 @@ const ProductSchema = new Schema(
   }
 );
 
+ProductSchema.index({ createdAt: -1 });
+ProductSchema.index({ category: 1, createdAt: -1 });
+ProductSchema.index({ isFeatured: 1, updatedAt: -1 });
+ProductSchema.index({ salesCount: -1, views: -1, createdAt: -1 });
+ProductSchema.index({ price: 1, createdAt: -1 });
+ProductSchema.index({ category: 1, price: 1 });
+
 export const Product: Model<any> = models.Product || model("Product", ProductSchema);

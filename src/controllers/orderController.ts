@@ -109,6 +109,90 @@ const getAllOrders = async (req: Request, res: Response, next: NextFunction) => 
   }
 };
 
+const getOrderStats = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const isPaid = {
+      $or: [
+        { $eq: ["$paid", true] },
+        { $eq: ["$paymentStatus", "paid"] },
+        { $in: ["$orderStatus", ["paid", "completed"]] },
+      ],
+    };
+
+    const [result] = await Order.aggregate([
+      {
+        $addFields: {
+          _isPaid: isPaid,
+          _units: {
+            $sum: {
+              $map: {
+                input: { $ifNull: ["$products", []] },
+                as: "p",
+                in: { $ifNull: ["$$p.quantity", 0] },
+              },
+            },
+          },
+          _revenue: { $ifNull: ["$grandTotal", { $ifNull: ["$totalAmount", 0] }] },
+          _fulfillment: { $ifNull: ["$fulfillmentStatus", "unfulfilled"] },
+          _orderStatus: { $ifNull: ["$orderStatus", "pending_payment"] },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          paidCount: { $sum: { $cond: ["$_isPaid", 1, 0] } },
+          revenue: { $sum: { $cond: ["$_isPaid", "$_revenue", 0] } },
+          unitsSold: { $sum: { $cond: ["$_isPaid", "$_units", 0] } },
+          toFulfill: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    "$_isPaid",
+                    { $in: ["$_fulfillment", ["unfulfilled", "processing"]] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          awaitingPayment: {
+            $sum: { $cond: [{ $eq: ["$_orderStatus", "pending_payment"] }, 1, 0] },
+          },
+          processing: {
+            $sum: { $cond: [{ $eq: ["$_fulfillment", "processing"] }, 1, 0] },
+          },
+          shipped: { $sum: { $cond: [{ $eq: ["$_fulfillment", "shipped"] }, 1, 0] } },
+          delivered: {
+            $sum: { $cond: [{ $eq: ["$_fulfillment", "delivered"] }, 1, 0] },
+          },
+        },
+      },
+    ]);
+
+    const stats = result || {
+      total: 0,
+      paidCount: 0,
+      revenue: 0,
+      unitsSold: 0,
+      toFulfill: 0,
+      awaitingPayment: 0,
+      processing: 0,
+      shipped: 0,
+      delivered: 0,
+    };
+
+    delete (stats as any)._id;
+    const avgOrder = stats.paidCount ? stats.revenue / stats.paidCount : 0;
+
+    res.status(200).json({ ...stats, avgOrder });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getMyOrders = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = req.user;
@@ -490,6 +574,7 @@ const deleteOrder = async (req: Request, res: Response, next: NextFunction) => {
 
 export default {
   getAllOrders,
+  getOrderStats,
   getMyOrders,
   createOrder,
   updateOrder,

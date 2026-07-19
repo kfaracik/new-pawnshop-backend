@@ -2,6 +2,7 @@ import { Router } from "express";
 import productController from "../controllers/productController";
 import { isAdmin } from "../middlewares/authAdmin";
 import { authenticateUser } from "../middlewares/authenticateUser";
+import { publicCache } from "../middlewares/publicCache";
 
 const router = Router();
 
@@ -368,12 +369,12 @@ const router = Router();
  *         description: Internal server error
  */
 
-router.get("/", productController.getAllProducts);
-router.get("/new", productController.getNewProducts);
-router.get("/featured", productController.getFeaturedProducts);
-router.get("/suggested", productController.getSuggestedProducts);
-router.get("/popular", productController.getPopularProducts);
-router.get("/search", productController.searchProducts);
+router.get("/", publicCache(60, 300), productController.getAllProducts);
+router.get("/new", publicCache(120, 600), productController.getNewProducts);
+router.get("/featured", publicCache(120, 600), productController.getFeaturedProducts);
+router.get("/suggested", publicCache(120, 600), productController.getSuggestedProducts);
+router.get("/popular", publicCache(120, 600), productController.getPopularProducts);
+router.get("/search", publicCache(30, 120), productController.searchProducts);
 router.get("/:id", productController.getProduct);
 router.post("/", authenticateUser, isAdmin, productController.createProduct);
 router.put("/:id", authenticateUser, isAdmin, productController.updateProduct);
