@@ -40,6 +40,13 @@ const PAYMENT_STATUSES = new Set([
   "canceled",
   "refunded",
 ]);
+const FULFILLMENT_STATUSES = new Set([
+  "unfulfilled",
+  "processing",
+  "shipped",
+  "delivered",
+  "canceled",
+]);
 
 const isActiveReservedOrder = (order: any) =>
   order?.orderStatus === "pending_payment" &&
@@ -295,7 +302,8 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
 
   try {
     const id = getSingleValue(req.params.id);
-    const { orderStatus, paymentStatus, paid } = req.body || {};
+    const { orderStatus, paymentStatus, paid, fulfillmentStatus, trackingNote } =
+      req.body || {};
     let updatedOrder: any = null;
     let shouldEmailConfirmation = false;
 
@@ -313,6 +321,13 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
 
     if (paymentStatus !== undefined && !PAYMENT_STATUSES.has(paymentStatus)) {
       return res.status(400).json({ message: "Invalid payment status" });
+    }
+
+    if (
+      fulfillmentStatus !== undefined &&
+      !FULFILLMENT_STATUSES.has(fulfillmentStatus)
+    ) {
+      return res.status(400).json({ message: "Invalid fulfillment status" });
     }
 
     await session.withTransaction(async () => {
@@ -340,6 +355,14 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
         } else if (order.paymentStatus === "canceled") {
           order.orderStatus = "canceled";
         }
+      }
+
+      if (fulfillmentStatus) {
+        order.fulfillmentStatus = fulfillmentStatus;
+      }
+
+      if (typeof trackingNote === "string") {
+        order.trackingNote = trackingNote.slice(0, 500);
       }
 
       if (typeof paid === "boolean") {

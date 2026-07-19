@@ -73,6 +73,12 @@ const OrderSchema = new Schema(
       enum: ["pending_payment", "paid", "completed", "canceled", "failed"],
       default: "pending_payment",
     },
+    fulfillmentStatus: {
+      type: String,
+      enum: ["unfulfilled", "processing", "shipped", "delivered", "canceled"],
+      default: "unfulfilled",
+    },
+    trackingNote: { type: String, default: "" },
     paymentStatus: {
       type: String,
       enum: ["unpaid", "pending", "paid", "failed", "canceled", "refunded"],
