@@ -1,0 +1,61 @@
+name: DB Backup
+
+# Cyclic MongoDB backup. Runs a mongodump against the Atlas cluster and stores
+# the compressed archive as a workflow artifact (rolling retention below).
+#
+# Setup (one-time): add a repository secret named MONGODB_URI
+#   Settings → Secrets and variables → Actions → New repository secret
+#   value = the same mongodb+srv connection string the backend uses.
+#
+# Restore a backup: download the artifact, then
+#   mongorestore --uri="$MONGODB_URI" --gzip --archive=backup-<stamp>.gz
+# (add --drop to overwrite existing collections; --nsInclude to restore a subset)
+
+on:
+  schedule:
+    - cron: "0 3 * * *" # daily at 03:00 UTC
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install MongoDB Database Tools
+        run: |
+          set -euo pipefail
+          VERSION=100.10.0
+          curl -fsSL -o tools.tgz \
+            "https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-${VERSION}.tgz"
+          tar xzf tools.tgz
+          sudo cp mongodb-database-tools-*/bin/* /usr/local/bin/
+          mongodump --version | head -1
+
+      - name: Create backup
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: |
+          set -euo pipefail
+          if [ -z "${MONGODB_URI:-}" ]; then
+            echo "::error::MONGODB_URI secret is not set. Add it under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          STAMP="$(date -u +'%Y-%m-%dT%H-%M-%SZ')"
+          mkdir -p backups
+          mongodump --uri="$MONGODB_URI" --gzip --archive="backups/backup-${STAMP}.gz"
+          echo "stamp=${STAMP}" >> "$GITHUB_ENV"
+          ls -lh backups
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ env.stamp }}
+          path: backups/*.gz
+          retention-days: 30
+          if-no-files-found: error
