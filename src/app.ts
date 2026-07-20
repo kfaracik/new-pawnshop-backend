@@ -102,8 +102,8 @@ const stripeWebhookHandler = [
 app.post("/api/stripe/webhook", ...stripeWebhookHandler);
 app.post("/api/v1/stripe/webhook", ...stripeWebhookHandler);
 
-app.use(express.json({ limit: "100kb" }));
-app.use(express.urlencoded({ extended: true, limit: "100kb" }));
+app.use(express.json({ limit: "8mb" }));
+app.use(express.urlencoded({ extended: true, limit: "8mb" }));
 app.use(requestLogger);
 app.use(
   cors({
