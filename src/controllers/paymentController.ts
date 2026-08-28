@@ -18,6 +18,28 @@ import { computeOrderAmountCents } from "../utils/payment";
 const isPaidOrder = (order: any) =>
   order?.paid === true || order?.paymentStatus === "paid";
 
+// Orders that belong to a registered user may only be touched by that user
+// (or an admin). Guest orders (no userId) stay reachable by their id, which
+// acts as the checkout-flow capability — but see safeOrderView: we never return
+// customer PII to these endpoints regardless of who calls them.
+const canAccessOrder = (order: any, req: Request): boolean => {
+  const user = req.user;
+  if (user?.isAdmin) return true;
+  if (!order?.userId) return true;
+  if (!user?._id) return false;
+  return String(order.userId) === String(user._id);
+};
+
+// Minimal, PII-free projection returned to the (possibly unauthenticated)
+// checkout flow. Name/email/address never leave through these endpoints.
+const safeOrderView = (order: any) => ({
+  _id: String(order._id),
+  paid: order.paid === true || order.paymentStatus === "paid",
+  paymentStatus: order.paymentStatus,
+  orderStatus: order.orderStatus,
+  paymentMethod: order.paymentMethod,
+});
+
 const createCheckoutSession = async (
   req: Request,
   res: Response,
@@ -37,6 +59,10 @@ const createCheckoutSession = async (
 
     const order = await Order.findById(id);
     if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    if (!canAccessOrder(order, req)) {
       return res.status(404).json({ message: "Order not found" });
     }
 
@@ -90,8 +116,12 @@ const confirmPayment = async (
       return res.status(404).json({ message: "Order not found" });
     }
 
+    if (!canAccessOrder(order, req)) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
     if (isPaidOrder(order)) {
-      return res.status(200).json({ paid: true, order: order.toObject() });
+      return res.status(200).json({ paid: true, order: safeOrderView(order) });
     }
 
     const sessionId =
@@ -132,7 +162,7 @@ const confirmPayment = async (
         sessionId: String(sessionId),
       });
 
-      return res.status(200).json({ paid: true, order: order.toObject() });
+      return res.status(200).json({ paid: true, order: safeOrderView(order) });
     }
 
     return res.status(200).json({

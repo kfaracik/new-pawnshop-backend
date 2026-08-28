@@ -43,7 +43,9 @@ export const normalizeCheckoutSelection = (value: unknown): CheckoutSelection =>
 
   return {
     deliveryMethod,
-    deliveryPrice: DELIVERY_PRICES[deliveryMethod] ?? normalizeMoney(input.deliveryPrice),
+    // Price is always taken from the server table — never from the client body.
+    // deliveryMethod is coerced to a known key above, so this never falls back.
+    deliveryPrice: DELIVERY_PRICES[deliveryMethod] ?? 0,
     paymentMethod,
   };
 };

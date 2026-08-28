@@ -24,5 +24,6 @@ export const createOrderSchema = z
       .max(100, "Zbyt wiele pozycji w zamówieniu"),
     deliveryMethod: z.string().trim().max(60).optional(),
     paymentMethod: z.string().trim().max(60).optional(),
+    deliveryPrice: z.number().nonnegative().max(100000).optional(),
   })
-  .passthrough();
+  .strip();

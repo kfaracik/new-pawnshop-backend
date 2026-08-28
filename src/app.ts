@@ -10,6 +10,7 @@ import { env } from "./config/env";
 import errorHandler from "./middlewares/errorHandler";
 import requireDatabase from "./middlewares/requireDatabase";
 import requestLogger from "./middlewares/requestLogger";
+import sanitizeMongo from "./middlewares/sanitizeMongo";
 import orderRoutes from "./routes/orderRoutes";
 import categoryRoutes from "./routes/categoryRoutes";
 import auctionRoutes from "./routes/auctionRoutes";
@@ -102,8 +103,24 @@ const stripeWebhookHandler = [
 app.post("/api/stripe/webhook", ...stripeWebhookHandler);
 app.post("/api/v1/stripe/webhook", ...stripeWebhookHandler);
 
-app.use(express.json({ limit: "8mb" }));
-app.use(express.urlencoded({ extended: true, limit: "8mb" }));
+// Large bodies are only legitimate for admin product writes (base64 images).
+// Everything else — including all unauthenticated auth/order routes — gets a
+// small limit so oversized payloads can't be used to exhaust memory/CPU.
+const LARGE_BODY_PATHS = ["/api/v1/products", "/api/products"];
+const largeJson = express.json({ limit: "8mb" });
+const largeUrlencoded = express.urlencoded({ extended: true, limit: "8mb" });
+const smallJson = express.json({ limit: "256kb" });
+const smallUrlencoded = express.urlencoded({ extended: true, limit: "256kb" });
+
+app.use((req, res, next) => {
+  const useLarge = LARGE_BODY_PATHS.some((base) => req.path.startsWith(base));
+  return (useLarge ? largeJson : smallJson)(req, res, next);
+});
+app.use((req, res, next) => {
+  const useLarge = LARGE_BODY_PATHS.some((base) => req.path.startsWith(base));
+  return (useLarge ? largeUrlencoded : smallUrlencoded)(req, res, next);
+});
+app.use(sanitizeMongo);
 app.use(requestLogger);
 app.use(
   cors({

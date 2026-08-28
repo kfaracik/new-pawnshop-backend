@@ -47,6 +47,7 @@ export const createAccessToken = (user: {
     },
     env.jwtSecret,
     {
+      algorithm: "HS256",
       subject: String(user._id),
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
@@ -56,6 +57,7 @@ export const createAccessToken = (user: {
 
 export const verifyAccessToken = (token: string) =>
   jwt.verify(token, env.jwtSecret, {
+    algorithms: ["HS256"],
     issuer: JWT_ISSUER,
     audience: JWT_AUDIENCE,
   }) as AccessTokenPayload;

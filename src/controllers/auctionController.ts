@@ -18,12 +18,29 @@ import {
   validateAuctionPayload,
 } from "../utils/auction";
 
+const AUCTION_STATUSES = new Set(["scheduled", "live", "ended", "canceled"]);
+
+// Bidder/winner identities are public data on these unauthenticated endpoints,
+// so the raw email is never exposed — only a masked handle (j***@gmail.com).
+const maskEmail = (email?: string | null): string | undefined => {
+  if (typeof email !== "string" || !email.includes("@")) return undefined;
+  const [local, domain] = email.split("@");
+  const head = local.slice(0, 1);
+  return `${head}${"*".repeat(Math.max(1, local.length - 1))}@${domain}`;
+};
+
+const maskUserRef = (ref: any) => {
+  if (!ref || typeof ref !== "object") return ref;
+  const { email, ...rest } = ref;
+  return { ...rest, maskedEmail: maskEmail(email) };
+};
+
 const getAllAuctions = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { status, productId } = req.query;
     const query: any = {};
 
-    if (status) {
+    if (typeof status === "string" && AUCTION_STATUSES.has(status)) {
       query.status = status;
     }
 
@@ -37,7 +54,12 @@ const getAllAuctions = async (req: Request, res: Response, next: NextFunction) =
       .sort({ startAt: -1 })
       .lean();
 
-    res.status(200).json(auctions);
+    res.status(200).json(
+      auctions.map((auction: any) => ({
+        ...auction,
+        winnerUserId: maskUserRef(auction.winnerUserId),
+      }))
+    );
   } catch (error) {
     next(error);
   }
@@ -62,7 +84,10 @@ const getAuctionById = async (req: Request, res: Response, next: NextFunction) =
       return res.status(404).json({ message: "Auction not found" });
     }
 
-    res.status(200).json(auction);
+    res.status(200).json({
+      ...auction,
+      winnerUserId: maskUserRef((auction as any).winnerUserId),
+    });
   } catch (error) {
     next(error);
   }
@@ -83,7 +108,9 @@ const getAuctionBids = async (req: Request, res: Response, next: NextFunction) =
       .sort({ createdAt: -1 })
       .lean();
 
-    res.status(200).json(bids);
+    res.status(200).json(
+      bids.map((bid: any) => ({ ...bid, userId: maskUserRef(bid.userId) }))
+    );
   } catch (error) {
     next(error);
   }
