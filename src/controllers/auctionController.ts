@@ -433,6 +433,18 @@ const closeAuction = async (req: Request, res: Response, next: NextFunction) => 
   }
 };
 
+// Cap concurrent SSE streams per client so an anonymous caller can't exhaust
+// server sockets by opening unbounded long-lived connections.
+const MAX_STREAMS_PER_IP = 5;
+const activeStreamsByIp = new Map<string, number>();
+
+const streamClientKey = (req: Request): string => {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string") return forwarded.split(",")[0].trim();
+  if (Array.isArray(forwarded)) return forwarded[0];
+  return req.socket?.remoteAddress || "unknown";
+};
+
 const streamAuctionEvents = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = getSingleValue(req.params.id);
@@ -443,10 +455,18 @@ const streamAuctionEvents = async (req: Request, res: Response, next: NextFuncti
       return res.status(400).json({ message: "Invalid auction id" });
     }
 
+    const clientKey = streamClientKey(req);
+    const currentStreams = activeStreamsByIp.get(clientKey) || 0;
+    if (currentStreams >= MAX_STREAMS_PER_IP) {
+      return res.status(429).json({ message: "Too many open streams." });
+    }
+
     const auction = await Auction.findById(id).lean<any>();
     if (!auction) {
       return res.status(404).json({ message: "Auction not found" });
     }
+
+    activeStreamsByIp.set(clientKey, currentStreams + 1);
 
     const { sendEvent } = initializeAuctionEventStream({
       res,
@@ -477,6 +497,12 @@ const streamAuctionEvents = async (req: Request, res: Response, next: NextFuncti
       clearInterval(keepAlive);
       auctionEvents.off(AUCTION_EVENT.BID_UPDATED, onBidUpdated);
       auctionEvents.off(AUCTION_EVENT.STATUS_CHANGED, onStatusChanged);
+      const remaining = (activeStreamsByIp.get(clientKey) || 1) - 1;
+      if (remaining <= 0) {
+        activeStreamsByIp.delete(clientKey);
+      } else {
+        activeStreamsByIp.set(clientKey, remaining);
+      }
       res.end();
     });
   } catch (error) {

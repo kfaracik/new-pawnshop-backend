@@ -25,6 +25,38 @@ const AVAILABILITY_MODES = new Set([
 const normalizeOptionalString = (value: unknown) =>
   typeof value === "string" ? value.trim() : undefined;
 
+const MAX_IMAGE_LENGTH = 4_000_000;
+const MAX_IMAGES = 12;
+
+// Reject images that could reach storefront rendering as a script vector or as
+// an oversized blob. Relative paths and https URLs are fine; the only data:
+// URIs allowed are base64-encoded images. Anything with another scheme
+// (javascript:, vbscript:, data:text, file:, …) is dropped.
+const isAllowedImage = (value: string) => {
+  if (!value || value.length > MAX_IMAGE_LENGTH) return false;
+  const schemeMatch = value.match(/^([a-z][a-z0-9+.-]*):/i);
+  if (!schemeMatch) return true; // relative / same-origin path
+  const scheme = schemeMatch[1].toLowerCase();
+  if (scheme === "https" || scheme === "http") return true;
+  if (scheme === "data") {
+    return /^data:image\/(jpeg|jpg|png|webp|gif|avif);base64,[A-Za-z0-9+/=]+$/.test(value);
+  }
+  return false;
+};
+
+// Only http(s) auction links are stored (blocks javascript:/data: hrefs).
+const normalizeAuctionLink = (value: unknown): string | null | undefined => {
+  if (value === null) return null;
+  const str = normalizeOptionalString(value);
+  if (str === undefined) return undefined;
+  try {
+    const url = new URL(str);
+    return url.protocol === "http:" || url.protocol === "https:" ? str : null;
+  } catch {
+    return null;
+  }
+};
+
 const normalizeOptionalNumber = (value: unknown) => {
   if (value === undefined || value === null || value === "") {
     return undefined;
@@ -55,8 +87,7 @@ export const normalizeProductInput = (body: Record<string, unknown> = {}) => {
   const quantity = normalizeOptionalNumber(body.quantity);
   const category = normalizeOptionalString(body.category);
   const availabilityMode = normalizeOptionalString(body.availabilityMode);
-  const auctionLink =
-    body.auctionLink === null ? null : normalizeOptionalString(body.auctionLink);
+  const auctionLink = normalizeAuctionLink(body.auctionLink);
   const properties = normalizeProperties(body.properties);
 
   if (title !== undefined) input.title = title;
@@ -74,7 +105,8 @@ export const normalizeProductInput = (body: Record<string, unknown> = {}) => {
   if (Array.isArray(body.images)) {
     input.images = body.images
       .map((image) => normalizeOptionalString(image))
-      .filter((image): image is string => Boolean(image));
+      .filter((image): image is string => Boolean(image) && isAllowedImage(image as string))
+      .slice(0, MAX_IMAGES);
   }
 
   if (Array.isArray(body.availableLocations)) {
