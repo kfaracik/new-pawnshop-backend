@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node ./dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run src/utils",
+    "test": "vitest run src",
     "validate:openapi": "node scripts/validate-openapi.js"
   },
   "author": "",

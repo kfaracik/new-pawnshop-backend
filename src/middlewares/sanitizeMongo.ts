@@ -6,7 +6,7 @@ import { Request, Response, NextFunction } from "express";
 // read-only getter on newer Express) and is bounded in depth to avoid abuse.
 const MAX_DEPTH = 8;
 
-function scrub(value: unknown, depth: number): void {
+export function scrub(value: unknown, depth = 0): void {
   if (depth > MAX_DEPTH || value === null || typeof value !== "object") return;
 
   if (Array.isArray(value)) {

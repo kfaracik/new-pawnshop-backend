@@ -14,31 +14,10 @@ import { logAudit, logError } from "../utils/logger";
 import ProductService from "../services/productService";
 import { sendOrderConfirmation } from "../services/mailService";
 import { computeOrderAmountCents } from "../utils/payment";
+import { canAccessOrder, safeOrderView } from "../utils/orderAccess";
 
 const isPaidOrder = (order: any) =>
   order?.paid === true || order?.paymentStatus === "paid";
-
-// Orders that belong to a registered user may only be touched by that user
-// (or an admin). Guest orders (no userId) stay reachable by their id, which
-// acts as the checkout-flow capability — but see safeOrderView: we never return
-// customer PII to these endpoints regardless of who calls them.
-const canAccessOrder = (order: any, req: Request): boolean => {
-  const user = req.user;
-  if (user?.isAdmin) return true;
-  if (!order?.userId) return true;
-  if (!user?._id) return false;
-  return String(order.userId) === String(user._id);
-};
-
-// Minimal, PII-free projection returned to the (possibly unauthenticated)
-// checkout flow. Name/email/address never leave through these endpoints.
-const safeOrderView = (order: any) => ({
-  _id: String(order._id),
-  paid: order.paid === true || order.paymentStatus === "paid",
-  paymentStatus: order.paymentStatus,
-  orderStatus: order.orderStatus,
-  paymentMethod: order.paymentMethod,
-});
 
 const createCheckoutSession = async (
   req: Request,
@@ -62,7 +41,7 @@ const createCheckoutSession = async (
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (!canAccessOrder(order, req)) {
+    if (!canAccessOrder(order, req.user)) {
       return res.status(404).json({ message: "Order not found" });
     }
 
@@ -116,7 +95,7 @@ const confirmPayment = async (
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (!canAccessOrder(order, req)) {
+    if (!canAccessOrder(order, req.user)) {
       return res.status(404).json({ message: "Order not found" });
     }
 
