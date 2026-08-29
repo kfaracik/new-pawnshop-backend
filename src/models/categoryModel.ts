@@ -71,7 +71,6 @@ const categorySchema = new Schema<ICategory>(
   }
 );
 
-categorySchema.index({ slug: 1 }, { unique: true });
 categorySchema.index({ parentId: 1, sortOrder: 1, name: 1 });
 
 export const Category: Model<ICategory> =

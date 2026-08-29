@@ -156,10 +156,14 @@ const bootstrapDatabaseServices = async () => {
   }
 };
 
-void bootstrapDatabaseServices();
-dbBootstrapInterval = setInterval(() => {
+// Tests connect mongoose to an in-memory server themselves; the retry interval
+// would also keep the vitest process alive.
+if (env.nodeEnv !== "test") {
   void bootstrapDatabaseServices();
-}, DB_BOOTSTRAP_RETRY_MS);
+  dbBootstrapInterval = setInterval(() => {
+    void bootstrapDatabaseServices();
+  }, DB_BOOTSTRAP_RETRY_MS);
+}
 
 if (env.enableApiDocs) {
   app.get("/openapi.json", (_req, res) => {
