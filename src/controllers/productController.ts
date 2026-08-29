@@ -43,10 +43,10 @@ const getProduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = getSingleValue(req.params.id);
     if (!id) {
-      return res.status(400).json({ error: "Product id is required" });
+      return res.status(400).json({ error: "Identyfikator produktu jest wymagany." });
     }
     if (!Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ error: "Invalid product id" });
+      return res.status(400).json({ error: "Nieprawidłowy identyfikator produktu." });
     }
     const trackView =
       getSingleValue(req.query.trackView as string | string[] | undefined) === "1" &&
@@ -54,7 +54,7 @@ const getProduct = async (req: Request, res: Response, next: NextFunction) => {
     const product = await ProductService.getProduct(id, { trackView });
 
     if (!product) {
-      return res.status(404).json({ error: "Product not found" });
+      return res.status(404).json({ error: "Nie znaleziono produktu." });
     }
 
     res.status(200).json(product);
@@ -195,10 +195,10 @@ const updateProduct = async (
   try {
     const id = getSingleValue(req.params.id);
     if (!id) {
-      return res.status(400).json({ message: "Product id is required" });
+      return res.status(400).json({ message: "Identyfikator produktu jest wymagany." });
     }
     if (!Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid product id" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator produktu." });
     }
     const productInput = normalizeProductInput(req.body);
     const validationError = validateProductInput(productInput);
@@ -212,7 +212,7 @@ const updateProduct = async (
       productInput
     );
     if (!updatedProduct) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json({ message: "Nie znaleziono produktu." });
     }
     logAudit("product_updated", {
       productId: updatedProduct?._id,
@@ -233,22 +233,22 @@ const deleteProduct = async (
   try {
     const id = getSingleValue(req.params.id);
     if (!id) {
-      return res.status(400).json({ message: "Product id is required" });
+      return res.status(400).json({ message: "Identyfikator produktu jest wymagany." });
     }
     if (!Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid product id" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator produktu." });
     }
 
     const deletedProduct = await ProductService.deleteProduct(id);
     if (!deletedProduct) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json({ message: "Nie znaleziono produktu." });
     }
     logAudit("product_deleted", {
       productId: deletedProduct?._id,
       userId: req.user?._id,
       title: deletedProduct?.title,
     });
-    res.status(200).json({ message: "Product deleted successfully" });
+    res.status(200).json({ message: "Produkt został usunięty." });
   } catch (error) {
     next(error);
   }

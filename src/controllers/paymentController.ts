@@ -33,16 +33,16 @@ const createCheckoutSession = async (
 
     const id = getSingleValue(req.params.id);
     if (!id || !Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid order id" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator zamówienia." });
     }
 
     const order = await Order.findById(id);
     if (!order) {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({ message: "Nie znaleziono zamówienia." });
     }
 
     if (!canAccessOrder(order, req.user)) {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({ message: "Nie znaleziono zamówienia." });
     }
 
     if (isPaidOrder(order)) {
@@ -52,7 +52,7 @@ const createCheckoutSession = async (
     if (order.paymentMethod !== "stripe_card") {
       return res
         .status(400)
-        .json({ message: "This order is not paid online with Stripe." });
+        .json({ message: "To zamówienie nie jest opłacane online przez Stripe." });
     }
 
     const session = await createCheckoutSessionForOrder(order);
@@ -87,16 +87,16 @@ const confirmPayment = async (
 
     const id = getSingleValue(req.params.id);
     if (!id || !Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid order id" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator zamówienia." });
     }
 
     const order = await Order.findById(id);
     if (!order) {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({ message: "Nie znaleziono zamówienia." });
     }
 
     if (!canAccessOrder(order, req.user)) {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({ message: "Nie znaleziono zamówienia." });
     }
 
     if (isPaidOrder(order)) {
@@ -106,7 +106,7 @@ const confirmPayment = async (
     const sessionId =
       getSingleValue(req.body?.sessionId) || order.paymentSessionId;
     if (!sessionId) {
-      return res.status(400).json({ message: "Missing payment session id" });
+      return res.status(400).json({ message: "Brak identyfikatora sesji płatności." });
     }
 
     const session = await retrieveCheckoutSession(String(sessionId));
@@ -114,7 +114,7 @@ const confirmPayment = async (
     if (session.metadata?.orderId !== String(order._id)) {
       return res
         .status(400)
-        .json({ message: "Payment session does not match this order." });
+        .json({ message: "Sesja płatności nie pasuje do tego zamówienia." });
     }
 
     const expectedAmount = computeOrderAmountCents(order);
@@ -122,7 +122,7 @@ const confirmPayment = async (
     if (session.currency !== "pln" || Number(session.amount_total) !== expectedAmount) {
       return res
         .status(400)
-        .json({ message: "Payment amount does not match this order." });
+        .json({ message: "Kwota płatności nie zgadza się z zamówieniem." });
     }
 
     if (session.payment_status === "paid") {

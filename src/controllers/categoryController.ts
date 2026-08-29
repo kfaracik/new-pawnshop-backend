@@ -131,7 +131,7 @@ const createCategory = async (
     } = req.body;
 
     if (!name || typeof name !== "string") {
-      return res.status(400).json({ message: "Name is required" });
+      return res.status(400).json({ message: "Nazwa jest wymagana." });
     }
 
     const normalizedSlug =
@@ -140,17 +140,17 @@ const createCategory = async (
         : slugify(name);
 
     if (!normalizedSlug) {
-      return res.status(400).json({ message: "Invalid slug" });
+      return res.status(400).json({ message: "Nieprawidłowy adres (slug)." });
     }
 
     if (parentId && !Types.ObjectId.isValid(parentId)) {
-      return res.status(400).json({ message: "Invalid parentId" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator kategorii nadrzędnej." });
     }
 
     if (parentId) {
       const parentCategory = await Category.findById(parentId).select("_id");
       if (!parentCategory) {
-        return res.status(400).json({ message: "Parent category not found" });
+        return res.status(400).json({ message: "Nie znaleziono kategorii nadrzędnej." });
       }
     }
 
@@ -183,17 +183,17 @@ const updateCategory = async (
   try {
     const id = getSingleValue(req.params.id);
     if (!id) {
-      return res.status(400).json({ message: "Category id is required" });
+      return res.status(400).json({ message: "Identyfikator kategorii jest wymagany." });
     }
     const { name, slug, parentId, isActive, sortOrder, properties } = req.body;
 
     if (!Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid category id" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator kategorii." });
     }
 
     const existing = await Category.findById(id).lean<any>();
     if (!existing) {
-      return res.status(404).json({ message: "Category not found" });
+      return res.status(404).json({ message: "Nie znaleziono kategorii." });
     }
 
     const updateData: Record<string, unknown> = {};
@@ -206,7 +206,7 @@ const updateCategory = async (
     if (typeof slug === "string") {
       const normalizedSlug = slugify(slug);
       if (!normalizedSlug) {
-        return res.status(400).json({ message: "Invalid slug" });
+        return res.status(400).json({ message: "Nieprawidłowy adres (slug)." });
       }
       updateData.slug = normalizedSlug;
     } else if (typeof name === "string" && !existing.slug) {
@@ -215,13 +215,13 @@ const updateCategory = async (
 
     if (parentId !== undefined) {
       if (parentId !== null && !Types.ObjectId.isValid(parentId)) {
-        return res.status(400).json({ message: "Invalid parentId" });
+        return res.status(400).json({ message: "Nieprawidłowy identyfikator kategorii nadrzędnej." });
       }
 
       if (parentId) {
         const parentCategory = await Category.findById(parentId).select("_id");
         if (!parentCategory) {
-          return res.status(400).json({ message: "Parent category not found" });
+          return res.status(400).json({ message: "Nie znaleziono kategorii nadrzędnej." });
         }
       }
 
@@ -229,7 +229,7 @@ const updateCategory = async (
       if (hasCycle) {
         return res
           .status(400)
-          .json({ message: "Invalid hierarchy: cycle detected" });
+          .json({ message: "Nieprawidłowa hierarchia: wykryto cykl." });
       }
 
       updateData.parentId = parentId;
@@ -241,7 +241,7 @@ const updateCategory = async (
 
     if (sortOrder !== undefined) {
       if (!Number.isFinite(Number(sortOrder)) || Number(sortOrder) < 0) {
-        return res.status(400).json({ message: "Invalid sortOrder" });
+        return res.status(400).json({ message: "Nieprawidłowa kolejność sortowania." });
       }
       updateData.sortOrder = Number(sortOrder);
     }
@@ -274,11 +274,11 @@ const deleteCategory = async (
   try {
     const id = getSingleValue(req.params.id);
     if (!id) {
-      return res.status(400).json({ message: "Category id is required" });
+      return res.status(400).json({ message: "Identyfikator kategorii jest wymagany." });
     }
 
     if (!Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid category id" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator kategorii." });
     }
 
     const hasChildren = await Category.exists({ parentId: id });
@@ -291,7 +291,7 @@ const deleteCategory = async (
     const category = await Category.findByIdAndDelete(id);
 
     if (!category) {
-      return res.status(404).json({ message: "Category not found" });
+      return res.status(404).json({ message: "Nie znaleziono kategorii." });
     }
 
     logAudit("category_deleted", {
@@ -299,7 +299,7 @@ const deleteCategory = async (
       userId: req.user?._id,
       name: category.name,
     });
-    res.status(200).json({ message: "Category deleted successfully" });
+    res.status(200).json({ message: "Kategoria została usunięta." });
   } catch (error) {
     next(error);
   }

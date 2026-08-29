@@ -55,10 +55,10 @@ const getAuctionById = async (req: Request, res: Response, next: NextFunction) =
   try {
     const id = getSingleValue(req.params.id);
     if (!id) {
-      return res.status(400).json({ message: "Auction id is required" });
+      return res.status(400).json({ message: "Identyfikator aukcji jest wymagany." });
     }
     if (!isValidObjectId(id)) {
-      return res.status(400).json({ message: "Invalid auction id" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator aukcji." });
     }
 
     const auction = await Auction.findById(id)
@@ -67,7 +67,7 @@ const getAuctionById = async (req: Request, res: Response, next: NextFunction) =
       .lean();
 
     if (!auction) {
-      return res.status(404).json({ message: "Auction not found" });
+      return res.status(404).json({ message: "Nie znaleziono aukcji." });
     }
 
     res.status(200).json({
@@ -83,10 +83,10 @@ const getAuctionBids = async (req: Request, res: Response, next: NextFunction) =
   try {
     const id = getSingleValue(req.params.id);
     if (!id) {
-      return res.status(400).json({ message: "Auction id is required" });
+      return res.status(400).json({ message: "Identyfikator aukcji jest wymagany." });
     }
     if (!isValidObjectId(id)) {
-      return res.status(400).json({ message: "Invalid auction id" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator aukcji." });
     }
 
     const bids = await Bid.find({ auctionId: id })
@@ -158,12 +158,12 @@ const createAuction = async (req: Request, res: Response, next: NextFunction) =>
 
     const product = await Product.findById(productId);
     if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json({ message: "Nie znaleziono produktu." });
     }
 
     const alreadyExists = await Auction.findOne({ productId }).select("_id").lean();
     if (alreadyExists) {
-      return res.status(409).json({ message: "Auction for this product already exists" });
+      return res.status(409).json({ message: "Aukcja dla tego produktu już istnieje." });
     }
 
     const startDate = new Date(startAt);
@@ -202,20 +202,20 @@ const updateAuction = async (req: Request, res: Response, next: NextFunction) =>
   try {
     const id = getSingleValue(req.params.id);
     if (!id) {
-      return res.status(400).json({ message: "Auction id is required" });
+      return res.status(400).json({ message: "Identyfikator aukcji jest wymagany." });
     }
 
     if (!isValidObjectId(id)) {
-      return res.status(400).json({ message: "Invalid auction id" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator aukcji." });
     }
 
     const auction = await Auction.findById(id);
     if (!auction) {
-      return res.status(404).json({ message: "Auction not found" });
+      return res.status(404).json({ message: "Nie znaleziono aukcji." });
     }
 
     if (auction.status === "ended") {
-      return res.status(409).json({ message: "Ended auction cannot be modified" });
+      return res.status(409).json({ message: "Zakończonej aukcji nie można modyfikować." });
     }
 
     const { startAt, endAt, startPrice, minIncrement, status } = req.body;
@@ -223,7 +223,7 @@ const updateAuction = async (req: Request, res: Response, next: NextFunction) =>
     if (startAt) {
       const startDate = new Date(startAt);
       if (Number.isNaN(startDate.getTime())) {
-        return res.status(400).json({ message: "Invalid startAt" });
+        return res.status(400).json({ message: "Nieprawidłowa data rozpoczęcia." });
       }
       auction.startAt = startDate;
     }
@@ -231,23 +231,23 @@ const updateAuction = async (req: Request, res: Response, next: NextFunction) =>
     if (endAt) {
       const endDate = new Date(endAt);
       if (Number.isNaN(endDate.getTime())) {
-        return res.status(400).json({ message: "Invalid endAt" });
+        return res.status(400).json({ message: "Nieprawidłowa data zakończenia." });
       }
       auction.endAt = endDate;
     }
 
     if (auction.endAt <= auction.startAt) {
-      return res.status(400).json({ message: "endAt must be later than startAt" });
+      return res.status(400).json({ message: "Data zakończenia musi być późniejsza niż rozpoczęcia." });
     }
 
     if (startPrice !== undefined) {
       if (!Number.isFinite(Number(startPrice)) || Number(startPrice) < 0) {
-        return res.status(400).json({ message: "Invalid startPrice" });
+        return res.status(400).json({ message: "Nieprawidłowa cena wywoławcza." });
       }
 
       const existingBids = await Bid.exists({ auctionId: id });
       if (existingBids) {
-        return res.status(409).json({ message: "Cannot change startPrice after first bid" });
+        return res.status(409).json({ message: "Nie można zmienić ceny wywoławczej po pierwszej ofercie." });
       }
 
       auction.startPrice = Number(startPrice);
@@ -256,7 +256,7 @@ const updateAuction = async (req: Request, res: Response, next: NextFunction) =>
 
     if (minIncrement !== undefined) {
       if (!Number.isFinite(Number(minIncrement)) || Number(minIncrement) <= 0) {
-        return res.status(400).json({ message: "Invalid minIncrement" });
+        return res.status(400).json({ message: "Nieprawidłowe minimalne przebicie." });
       }
       auction.minIncrement = Number(minIncrement);
     }
@@ -286,15 +286,15 @@ const deleteAuction = async (req: Request, res: Response, next: NextFunction) =>
   try {
     const id = getSingleValue(req.params.id);
     if (!id) {
-      return res.status(400).json({ message: "Auction id is required" });
+      return res.status(400).json({ message: "Identyfikator aukcji jest wymagany." });
     }
     if (!isValidObjectId(id)) {
-      return res.status(400).json({ message: "Invalid auction id" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator aukcji." });
     }
 
     const auction = await Auction.findByIdAndDelete(id);
     if (!auction) {
-      return res.status(404).json({ message: "Auction not found" });
+      return res.status(404).json({ message: "Nie znaleziono aukcji." });
     }
 
     await Bid.deleteMany({ auctionId: id });
@@ -303,7 +303,7 @@ const deleteAuction = async (req: Request, res: Response, next: NextFunction) =>
       auctionLink: null,
     });
 
-    res.status(200).json({ message: "Auction deleted successfully" });
+    res.status(200).json({ message: "Aukcja została usunięta." });
   } catch (error) {
     next(error);
   }
@@ -313,7 +313,7 @@ const placeBid = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = getSingleValue(req.params.id);
     if (!id) {
-      return res.status(400).json({ message: "Auction id is required" });
+      return res.status(400).json({ message: "Identyfikator aukcji jest wymagany." });
     }
     const { amount } = req.body;
     const userId = req.user?._id;
@@ -323,21 +323,21 @@ const placeBid = async (req: Request, res: Response, next: NextFunction) => {
     }
 
     if (!isValidObjectId(id)) {
-      return res.status(400).json({ message: "Invalid auction id" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator aukcji." });
     }
 
     if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
-      return res.status(400).json({ message: "Invalid bid amount" });
+      return res.status(400).json({ message: "Nieprawidłowa kwota oferty." });
     }
 
     const auction = await Auction.findById(id).lean<any>();
     if (!auction) {
-      return res.status(404).json({ message: "Auction not found" });
+      return res.status(404).json({ message: "Nie znaleziono aukcji." });
     }
 
     const now = new Date();
     if (auction.status !== "live" || now < new Date(auction.startAt) || now >= new Date(auction.endAt)) {
-      return res.status(409).json({ message: "Auction is not active" });
+      return res.status(409).json({ message: "Aukcja nie jest aktywna." });
     }
 
     const minAllowed = Number(auction.currentPrice) + Number(auction.minIncrement);
@@ -345,7 +345,7 @@ const placeBid = async (req: Request, res: Response, next: NextFunction) => {
 
     if (normalizedAmount < minAllowed) {
       return res.status(409).json({
-        message: `Bid must be at least ${minAllowed}`,
+        message: `Oferta musi wynosić co najmniej ${minAllowed}.`,
         minAllowed,
       });
     }
@@ -362,7 +362,7 @@ const placeBid = async (req: Request, res: Response, next: NextFunction) => {
     ).lean<any>();
 
     if (!updatedAuction) {
-      return res.status(409).json({ message: "Bid conflict. Please retry with latest price." });
+      return res.status(409).json({ message: "Konflikt ofert. Spróbuj ponownie z aktualną ceną." });
     }
 
     const bid = await Bid.create({
@@ -401,16 +401,16 @@ const closeAuction = async (req: Request, res: Response, next: NextFunction) => 
   try {
     const id = getSingleValue(req.params.id);
     if (!id) {
-      return res.status(400).json({ message: "Auction id is required" });
+      return res.status(400).json({ message: "Identyfikator aukcji jest wymagany." });
     }
     if (!isValidObjectId(id)) {
-      return res.status(400).json({ message: "Invalid auction id" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator aukcji." });
     }
 
     const closedAuction = await manualCloseAuction(id);
 
     if (!closedAuction) {
-      return res.status(404).json({ message: "Auction not found" });
+      return res.status(404).json({ message: "Nie znaleziono aukcji." });
     }
 
     res.status(200).json(closedAuction);
@@ -435,10 +435,10 @@ const streamAuctionEvents = async (req: Request, res: Response, next: NextFuncti
   try {
     const id = getSingleValue(req.params.id);
     if (!id) {
-      return res.status(400).json({ message: "Auction id is required" });
+      return res.status(400).json({ message: "Identyfikator aukcji jest wymagany." });
     }
     if (!isValidObjectId(id)) {
-      return res.status(400).json({ message: "Invalid auction id" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator aukcji." });
     }
 
     const clientKey = streamClientKey(req);
@@ -449,7 +449,7 @@ const streamAuctionEvents = async (req: Request, res: Response, next: NextFuncti
 
     const auction = await Auction.findById(id).lean<any>();
     if (!auction) {
-      return res.status(404).json({ message: "Auction not found" });
+      return res.status(404).json({ message: "Nie znaleziono aukcji." });
     }
 
     activeStreamsByIp.set(clientKey, currentStreams + 1);

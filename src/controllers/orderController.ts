@@ -238,17 +238,17 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
     });
 
     if (hasMissingCustomerFields(normalizedCustomer)) {
-      return res.status(400).json({ message: "Missing customer details" });
+      return res.status(400).json({ message: "Brakuje danych klienta." });
     }
 
     if (!Array.isArray(products) || products.length === 0) {
-      return res.status(400).json({ message: "Order must include at least one product" });
+      return res.status(400).json({ message: "Zamówienie musi zawierać co najmniej jeden produkt." });
     }
 
     const normalizedProducts = normalizeOrderProducts(products);
 
     if (hasInvalidOrderProducts(normalizedProducts)) {
-      return res.status(400).json({ message: "Invalid order products payload" });
+      return res.status(400).json({ message: "Nieprawidłowa lista produktów w zamówieniu." });
     }
 
     const uniqueProductIds = [...new Set(normalizedProducts.map((item) => item.productId))];
@@ -392,26 +392,26 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
     let shouldEmailConfirmation = false;
 
     if (!id) {
-      return res.status(400).json({ message: "Order id is required" });
+      return res.status(400).json({ message: "Identyfikator zamówienia jest wymagany." });
     }
 
     if (!Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid order id" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator zamówienia." });
     }
 
     if (orderStatus !== undefined && !ORDER_STATUSES.has(orderStatus)) {
-      return res.status(400).json({ message: "Invalid order status" });
+      return res.status(400).json({ message: "Nieprawidłowy status zamówienia." });
     }
 
     if (paymentStatus !== undefined && !PAYMENT_STATUSES.has(paymentStatus)) {
-      return res.status(400).json({ message: "Invalid payment status" });
+      return res.status(400).json({ message: "Nieprawidłowy status płatności." });
     }
 
     if (
       fulfillmentStatus !== undefined &&
       !FULFILLMENT_STATUSES.has(fulfillmentStatus)
     ) {
-      return res.status(400).json({ message: "Invalid fulfillment status" });
+      return res.status(400).json({ message: "Nieprawidłowy status realizacji." });
     }
 
     await session.withTransaction(async () => {
@@ -512,7 +512,7 @@ const updateOrder = async (req: Request, res: Response, next: NextFunction) => {
     res.status(200).json(updatedOrder);
   } catch (error) {
     if ((error as Error)?.message === "ORDER_NOT_FOUND") {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({ message: "Nie znaleziono zamówienia." });
     }
 
     next(error);
@@ -529,11 +529,11 @@ const deleteOrder = async (req: Request, res: Response, next: NextFunction) => {
     let deletedOrder: any = null;
 
     if (!id) {
-      return res.status(400).json({ message: "Order id is required" });
+      return res.status(400).json({ message: "Identyfikator zamówienia jest wymagany." });
     }
 
     if (!Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid order id" });
+      return res.status(400).json({ message: "Nieprawidłowy identyfikator zamówienia." });
     }
 
     await session.withTransaction(async () => {
@@ -552,7 +552,7 @@ const deleteOrder = async (req: Request, res: Response, next: NextFunction) => {
     });
 
     if (!deletedOrder) {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({ message: "Nie znaleziono zamówienia." });
     }
 
     logAudit("order_deleted", {
@@ -560,10 +560,10 @@ const deleteOrder = async (req: Request, res: Response, next: NextFunction) => {
       userId: req.user?._id,
     });
 
-    res.status(200).json({ message: "Order deleted successfully" });
+    res.status(200).json({ message: "Zamówienie zostało usunięte." });
   } catch (error) {
     if ((error as Error)?.message === "ORDER_NOT_FOUND") {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({ message: "Nie znaleziono zamówienia." });
     }
 
     next(error);
