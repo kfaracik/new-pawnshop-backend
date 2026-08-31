@@ -15,6 +15,7 @@ import orderRoutes from "./routes/orderRoutes";
 import categoryRoutes from "./routes/categoryRoutes";
 import auctionRoutes from "./routes/auctionRoutes";
 import locationRoutes from "./routes/locationRoutes";
+import inquiryRoutes from "./routes/inquiryRoutes";
 import paymentController from "./controllers/paymentController";
 import { startAuctionScheduler } from "./services/auctionService";
 import { startOrderReservationScheduler } from "./services/orderReservationService";
@@ -195,6 +196,7 @@ app.use("/api/v1/account", requireDatabase, accountRoutes);
 app.use("/api/v1/categories", requireDatabase, categoryRoutes);
 app.use("/api/v1/locations", requireDatabase, locationRoutes);
 app.use("/api/v1/orders", requireDatabase, orderRoutes);
+app.use("/api/v1/inquiries", requireDatabase, inquiryRoutes);
 app.use("/api/v1/auctions", requireDatabase, auctionRoutes);
 
 // Backward compatibility for existing clients.
@@ -205,6 +207,7 @@ app.use("/api/category", requireDatabase, categoryRoutes);
 app.use("/api/categories", requireDatabase, categoryRoutes);
 app.use("/api/locations", requireDatabase, locationRoutes);
 app.use("/api/order", requireDatabase, orderRoutes);
+app.use("/api/inquiries", requireDatabase, inquiryRoutes);
 app.use("/api/auctions", requireDatabase, auctionRoutes);
 
 app.use(errorHandler);
